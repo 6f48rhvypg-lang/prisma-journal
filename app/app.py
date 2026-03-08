@@ -198,12 +198,67 @@ def inject_globals():
     }
 
 
+@app.template_filter('format_date')
+def format_date_filter(date_str, lang=None):
+    """Format a date string based on language preference.
+    
+    Args:
+        date_str: Date string (ISO format or datetime object)
+        lang: Language code ('de' or 'en'). If None, uses current UI language.
+    
+    Returns:
+        Formatted date string:
+        - German (de): DD.MM.YYYY (e.g., 30.06.2026)
+        - English (en): YYYY-MM-DD (e.g., 2026-06-30)
+    """
+    if not date_str:
+        return ""
+    
+    # Parse date string
+    try:
+        if isinstance(date_str, str):
+            # Handle both 'YYYY-MM-DD' and full ISO datetime strings
+            date_str_clean = date_str[:10] if len(date_str) > 10 else date_str
+            date_obj = datetime.fromisoformat(date_str_clean)
+        else:
+            date_obj = date_str
+    except (ValueError, TypeError):
+        return date_str
+    
+    # Get language
+    if lang is None:
+        lang = _current_language()
+    else:
+        lang = normalize_language(lang)
+    
+    # Format based on language
+    if lang == 'de':
+        # German format: DD.MM.YYYY
+        return date_obj.strftime('%d.%m.%Y')
+    else:
+        # English format: YYYY-MM-DD
+        return date_obj.strftime('%Y-%m-%d')
+
+
 def _current_language():
     return normalize_language(get_setting("ui_language") or Config.DEFAULT_LANGUAGE)
 
 
 def _t(key, **kwargs):
     return i18n_translate(key, _current_language(), **kwargs)
+
+
+def _translate_frameworks(frameworks):
+    """Translate framework names and descriptions."""
+    translated = []
+    for fw in frameworks:
+        name_key = f"framework.{fw['name'].lower().replace(' ', '_').replace('-', '_')}.name"
+        desc_key = f"framework.{fw['name'].lower().replace(' ', '_').replace('-', '_')}.description"
+        fw_copy = fw.copy()
+        fw_copy['name'] = _t(name_key) or fw['name']
+        fw_copy['description'] = _t(desc_key) or fw['description']
+        translated.append(fw_copy)
+    return translated
 
 
 def _entry_metadata(entry):
@@ -599,7 +654,7 @@ def dashboard():
     top_emotion = get_top_emotion()
     popular_tags = get_popular_tags(8)
     total_words = get_total_words()
-    frameworks = get_all_frameworks()
+    frameworks = _translate_frameworks(get_all_frameworks())
     return render_template(
         "dashboard.html",
         entries=recent,
@@ -627,7 +682,7 @@ def new_entry():
                 "entry_form.html",
                 error="Content is required.",
                 prompt=get_random_prompt(),
-                frameworks=get_all_frameworks(),
+                frameworks=_translate_frameworks(get_all_frameworks()),
             )
 
         if len(content) > Config.MAX_ENTRY_LENGTH:
@@ -635,7 +690,7 @@ def new_entry():
                 "entry_form.html",
                 error=f"Entry exceeds maximum length of {Config.MAX_ENTRY_LENGTH:,} characters.",
                 prompt=get_random_prompt(),
-                frameworks=get_all_frameworks(),
+                frameworks=_translate_frameworks(get_all_frameworks()),
             )
 
         if framework_id:
@@ -680,7 +735,7 @@ def new_entry():
     return render_template(
         "entry_form.html",
         prompt=prompt,
-        frameworks=get_all_frameworks(),
+        frameworks=_translate_frameworks(get_all_frameworks()),
         default_entry_type=default_pref,
     )
 
@@ -728,7 +783,7 @@ def edit_entry(entry_id):
                 entry=entry,
                 editing=True,
                 error=f"Entry exceeds maximum length of {Config.MAX_ENTRY_LENGTH:,} characters.",
-                frameworks=get_all_frameworks(),
+                frameworks=_translate_frameworks(get_all_frameworks()),
             )
 
         if framework_id:
@@ -753,7 +808,7 @@ def edit_entry(entry_id):
         "entry_form.html",
         entry=entry,
         editing=True,
-        frameworks=get_all_frameworks(),
+        frameworks=_translate_frameworks(get_all_frameworks()),
     )
 
 
@@ -821,7 +876,7 @@ def journal():
     all_emotions = get_unique_emotions()
     all_tags = get_popular_tags(30)
     all_entry_types = get_unique_entry_types()
-    frameworks = get_all_frameworks()
+    frameworks = _translate_frameworks(get_all_frameworks())
 
     return render_template(
         "journal.html",
@@ -942,9 +997,9 @@ def settings():
         framework_message = "Framework saved."
     if request.method == "GET":
         settings_data = _get_settings_with_defaults()
-    services = status.summary()
+    services = status.summary(_current_language())
     ollama_models = _get_ollama_models() if status.ollama else []
-    frameworks = get_all_frameworks()
+    frameworks = _translate_frameworks(get_all_frameworks())
 
     # System prompts for the prompt editor section
     system_prompts = get_all_system_prompts()
@@ -955,10 +1010,14 @@ def settings():
         matches = re.findall(r'\{(\w+)\}', sp.get("prompt_text", ""))
         prompt_placeholders[sp["key"]] = list(dict.fromkeys(matches))  # unique, order-preserved
 
+    # Get current language for i18n
+    lang = _current_language()
+    
     # Group prompts by WHERE they are processed in the application
     # This helps users understand which prompts affect which features
-    prompt_categories = {
-        "📓 Journal Entry (Entry Creation & Analysis)": [
+    # Keys map to i18n keys
+    prompt_categories_keys = {
+        "entry": [
             "analyze_entry",
             "generate_summary_and_title",
             "detect_emotions",
@@ -969,38 +1028,37 @@ def settings():
             "tag_extraction",
             "suggest_title",
         ],
-        "🏠 Dashboard (Daily Engagement)": [
+        "dashboard": [
             "daily_reflection_question",
             "generate_personalized_prompts",
             "generate_personalized_prompts_embeddings",
         ],
-        "📊 Insights (Pattern Analysis)": [
+        "insights": [
             "generate_big_five_analysis",
             "generate_recurring_topics",
             "identify_baustellen",
         ],
-        "💬 AI Chat (Conversational Assistant)": [
+        "chat": [
             "chat_persona_entry",
             "chat_persona_global",
         ],
-        "🎨 Image Generation (Artwork)": [
+        "image": [
             "generate_image_prompt",
         ],
-        "🔧 Unused / Legacy": [
+        "legacy": [
             "emotion_summary",
             "image_generation",
         ],
     }
-
-    # Category descriptions to help users understand each section
-    prompt_category_descriptions = {
-        "📓 Journal Entry (Entry Creation & Analysis)": "Prompts used when creating entries, analyzing content, detecting emotions, and generating artwork. These affect the 'Finish Entry' flow and entry view page.",
-        "🏠 Dashboard (Daily Engagement)": "Prompts for the homepage features: daily reflection questions and personalized writing suggestions based on your journal history.",
-        "📊 Insights (Pattern Analysis)": "Prompts for the analytics page: Big Five personality analysis and recurring topic insights across multiple entries.",
-        "💬 AI Chat (Conversational Assistant)": "System prompts that define the AI's persona when chatting about entries (therapist mode) or analyzing patterns across entries (analyst mode).",
-        "🎨 Image Generation (Artwork)": "Prompts for generating images directly from entry content via the image generation API.",
-        "🔧 Unused / Legacy": "These prompts are not currently used in the application but are kept for compatibility or future features.",
-    }
+    
+    # Build translated category names and descriptions
+    prompt_categories = {}
+    prompt_category_descriptions = {}
+    for key, prompt_list in prompt_categories_keys.items():
+        cat_name = i18n_translate(f"ui.settings.category.{key}", lang)
+        cat_desc = i18n_translate(f"ui.settings.category_desc.{key}", lang)
+        prompt_categories[cat_name] = prompt_list
+        prompt_category_descriptions[cat_name] = cat_desc
 
     return render_template(
         "settings.html",
@@ -1834,7 +1892,7 @@ def api_settings_import():
 def api_refresh_services():
     """Re-check all service availability."""
     refresh_service_status()
-    return jsonify({"services": status.summary()})
+    return jsonify({"services": status.summary(_current_language())})
 
 
 # ---------------------------------------------------------------------------
@@ -3309,9 +3367,9 @@ Examples:
     init_services()
     init_db()
 
-    # Persist CLI language override to UI settings for consistent template/API language.
-    if args.language:
-        set_setting("ui_language", normalize_language(Config.DEFAULT_LANGUAGE))
+    # Always set ui_language to DEFAULT_LANGUAGE on startup (ensures German default).
+    # CLI override takes precedence, otherwise defaults to German.
+    set_setting("ui_language", normalize_language(Config.DEFAULT_LANGUAGE))
 
     effective_default_language = normalize_language(Config.DEFAULT_LANGUAGE)
     persisted_ui_language = normalize_language(
