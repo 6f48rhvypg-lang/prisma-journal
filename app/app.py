@@ -1327,6 +1327,23 @@ def api_upload_artwork():
     return jsonify({"image_url": url})
 
 
+@app.route("/api/delete/artwork", methods=["POST"])
+def api_delete_artwork():
+    """Delete/reset the artwork for an entry."""
+    data = request.get_json()
+    entry_id = data.get("entry_id")
+    if not entry_id:
+        return jsonify({"error": "entry_id is required"}), 400
+    
+    entry = get_entry(entry_id)
+    if not entry:
+        return jsonify({"error": "Entry not found"}), 404
+    
+    # Clear the artwork_path and artwork_style
+    update_entry(entry_id, artwork_path=None, artwork_style=None)
+    return jsonify({"success": True})
+
+
 @app.route("/api/prompt")
 def api_prompt():
     """Get a random journal prompt."""

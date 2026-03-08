@@ -104,6 +104,9 @@
                     <span id="artwork-file-name" class="min-w-0 flex-1 text-sm text-surface-500 dark:text-surface-400 break-words whitespace-normal leading-tight pt-2">{{ t('ui.entry.no_file_selected') }}</span>
                 </div>
                 <button onclick="uploadArtwork()" id="upload-btn" class="mt-2 w-full bg-surface-100 dark:bg-surface-600 hover:bg-surface-200 dark:hover:bg-surface-500 text-surface-700 dark:text-surface-50 text-sm font-medium px-4 py-2 rounded-lg transition">{{ t('ui.entry.upload_image') }}</button>
+                {% if entry.artwork_path %}
+                <button onclick="deleteArtwork()" id="delete-artwork-btn" class="mt-2 w-full bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 text-sm font-medium px-4 py-2 rounded-lg transition">{{ t('ui.entry.delete_artwork') }}</button>
+                {% endif %}
                 <p class="text-xs text-surface-400 dark:text-surface-500 mt-2">PNG, JPG, WEBP, GIF</p>
             </div>
         </div>
@@ -150,7 +153,13 @@
         uploading: {{ t('ui.entry.uploading') | tojson }},
         uploadingImage: {{ t('ui.entry.uploading_image') | tojson }},
         uploadComplete: {{ t('ui.entry.upload_complete') | tojson }},
-        uploadFailed: {{ t('ui.entry.upload_failed') | tojson }}
+        uploadFailed: {{ t('ui.entry.upload_failed') | tojson }},
+        deleteArtwork: {{ t('ui.entry.delete_artwork') | tojson }},
+        deleteArtworkConfirm: {{ t('ui.entry.delete_artwork_confirm') | tojson }},
+        deletingArtwork: {{ t('ui.entry.deleting_artwork') | tojson }},
+        artworkDeleted: {{ t('ui.entry.artwork_deleted') | tojson }},
+        deleteArtworkFailed: {{ t('ui.entry.delete_artwork_failed') | tojson }},
+        artworkEmpty: {{ t('ui.entry.artwork_empty') | tojson }}
     };
 
     async function analyzeEntry() {
@@ -256,6 +265,8 @@
                 status.textContent = i18nEntryView.uploadComplete;
                 input.value = '';
                 updateArtworkFileLabel();
+                // Show delete button after upload
+                showDeleteButton();
             } else {
                 status.textContent = data.error || i18nEntryView.uploadFailed;
             }
@@ -264,5 +275,58 @@
         }
         setArtworkLoading(false);
     }
+
+    async function deleteArtwork() {
+        if (!confirm(i18nEntryView.deleteArtworkConfirm)) {
+            return;
+        }
+        const status = document.getElementById('artwork-status');
+        const container = document.getElementById('image-content');
+        const deleteBtn = document.getElementById('delete-artwork-btn');
+        
+        if (deleteBtn) deleteBtn.disabled = true;
+        status.textContent = i18nEntryView.deletingArtwork;
+        
+        try {
+            const resp = await fetch('/api/delete/artwork', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ entry_id: entryId })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                container.innerHTML = '<div class="rounded-xl border border-dashed border-surface-200 dark:border-surface-700 p-6 text-sm text-surface-400 dark:text-surface-500">' + 
+                    i18nEntryView.artworkEmpty + '</div>';
+                status.textContent = i18nEntryView.artworkDeleted;
+                // Hide delete button after deletion
+                if (deleteBtn) deleteBtn.style.display = 'none';
+            } else {
+                status.textContent = data.error || i18nEntryView.deleteArtworkFailed;
+                if (deleteBtn) deleteBtn.disabled = false;
+            }
+        } catch (e) {
+            status.textContent = i18nEntryView.deleteArtworkFailed;
+            if (deleteBtn) deleteBtn.disabled = false;
+        }
+    }
+
+    function showDeleteButton() {
+        const deleteBtn = document.getElementById('delete-artwork-btn');
+        if (!deleteBtn) {
+            // Create and add the button if it doesn't exist
+            const uploadBtn = document.getElementById('upload-btn');
+            if (uploadBtn) {
+                const newBtn = document.createElement('button');
+                newBtn.id = 'delete-artwork-btn';
+                newBtn.onclick = deleteArtwork;
+                newBtn.className = 'mt-2 w-full bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 text-sm font-medium px-4 py-2 rounded-lg transition';
+                newBtn.textContent = i18nEntryView.deleteArtwork;
+                uploadBtn.parentNode.insertBefore(newBtn, uploadBtn.nextSibling);
+            }
+        } else {
+            deleteBtn.style.display = 'block';
+        }
+    }
+
 </script>
 {% endblock %}
