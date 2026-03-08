@@ -267,6 +267,20 @@ def _get_prompt(key, **kwargs):
     return prompt
 
 
+def _check_llm_available():
+    """Check if the configured LLM provider is available. Returns (is_available, error_message)."""
+    from utils.services import status
+    
+    if Config.LLM_PROVIDER == "lmstudio":
+        if not status.lmstudio:
+            return False, f"LM Studio is not available. {status.lmstudio_message}"
+    else:  # Default to Ollama
+        if not status.ollama:
+            return False, f"Ollama is not available. {status.ollama_message}"
+    
+    return True, ""
+
+
 # ---------------------------------------------------------------------------
 # Retry and Error Handling Configuration
 # ---------------------------------------------------------------------------
@@ -513,10 +527,9 @@ def generate_image_prompt(content):
 
 def generate_deeper_questions(text, previous_questions=None):
     """Generate a reflective follow-up question for a journal entry."""
-    from utils.services import status
-
-    if not status.ollama:
-        return {"error": f"[Ollama is not available. {status.ollama_message}]"}
+    llm_ok, llm_error = _check_llm_available()
+    if not llm_ok:
+        return {"error": f"[{llm_error}]"}
 
     if not text or len(text.strip()) < 20:
         return {"error": "Entry is too short to generate meaningful questions."}
@@ -658,10 +671,9 @@ def generate_summary_and_title(content):
         dict with keys: summary, title, themes
         or dict with key: error
     """
-    from utils.services import status
-
-    if not status.ollama:
-        return {"error": f"[Ollama is not available. {status.ollama_message}]"}
+    llm_ok, llm_error = _check_llm_available()
+    if not llm_ok:
+        return {"error": f"[{llm_error}]"}
 
     if not content or len(content.strip()) < 10:
         return {"error": "Entry content is too short for analysis."}
@@ -688,10 +700,9 @@ def detect_emotions(content):
         dict with key: emotions (list of {emotion, intensity, frequency, passages})
         or dict with key: error
     """
-    from utils.services import status
-
-    if not status.ollama:
-        return {"error": f"[Ollama is not available. {status.ollama_message}]"}
+    llm_ok, llm_error = _check_llm_available()
+    if not llm_ok:
+        return {"error": f"[{llm_error}]"}
 
     if not content or len(content.strip()) < 10:
         return {"error": "Entry content is too short for emotion analysis."}
@@ -739,10 +750,10 @@ def identify_patterns(content, themes=None):
         or dict with key: error
     """
     import json
-    from utils.services import status
 
-    if not status.ollama:
-        return {"error": f"[Ollama is not available. {status.ollama_message}]"}
+    llm_ok, llm_error = _check_llm_available()
+    if not llm_ok:
+        return {"error": f"[{llm_error}]"}
 
     themes_hint = ""
     if themes:
@@ -781,10 +792,9 @@ def generate_artwork_prompt_for_analysis(themes, emotions, sentiment):
         dict with key: artwork_prompt
         or dict with key: error
     """
-    from utils.services import status
-
-    if not status.ollama:
-        return {"error": f"[Ollama is not available. {status.ollama_message}]"}
+    llm_ok, llm_error = _check_llm_available()
+    if not llm_ok:
+        return {"error": f"[{llm_error}]"}
 
     style = Config.SD_DEFAULT_STYLE
 
@@ -824,10 +834,9 @@ def generate_personalized_prompts(themes_history, emotions_history, recent_topic
         or dict with key: error
     """
     import json
-    from utils.services import status
-
-    if not status.ollama:
-        return {"error": f"[Ollama is not available. {status.ollama_message}]"}
+    llm_ok, llm_error = _check_llm_available()
+    if not llm_ok:
+        return {"error": f"[{llm_error}]"}
 
     if entry_count < 3:
         return {"error": "Not enough journal history to generate personalized prompts. Minimum 3 entries required."}
@@ -888,10 +897,10 @@ def generate_personalized_prompts_from_embeddings(
         entry_count: Total number of entries
     """
     import json
-    from utils.services import status
 
-    if not status.ollama:
-        return {"error": f"[Ollama is not available. {status.ollama_message}]"}
+    llm_ok, llm_error = _check_llm_available()
+    if not llm_ok:
+        return {"error": f"[{llm_error}]"}
 
     if entry_count < 3:
         return {"error": "Not enough journal history to generate personalized prompts. Minimum 3 entries required."}
@@ -947,10 +956,9 @@ def generate_big_five_analysis(entry_summaries, timeframe_label):
         dict with keys: openness, conscientiousness, extraversion, agreeableness, neuroticism
         or dict with key: error
     """
-    from utils.services import status
-
-    if not status.ollama:
-        return {"error": f"[Ollama is not available. {status.ollama_message}]"}
+    llm_ok, llm_error = _check_llm_available()
+    if not llm_ok:
+        return {"error": f"[{llm_error}]"}
 
     if not entry_summaries:
         return {"error": "Not enough journal data for personality analysis."}
@@ -983,10 +991,9 @@ def generate_recurring_topics(topic_inputs):
         dict with key: topics (list of {title, insight})
         or dict with key: error
     """
-    from utils.services import status
-
-    if not status.ollama:
-        return {"error": f"[Ollama is not available. {status.ollama_message}]"}
+    llm_ok, llm_error = _check_llm_available()
+    if not llm_ok:
+        return {"error": f"[{llm_error}]"}
 
     if not topic_inputs:
         return {"error": "No topics available."}
@@ -1025,10 +1032,9 @@ def generate_baustellen_analysis(entry_data):
         dict with key: baustellen (list of Baustelle objects)
         or dict with key: error
     """
-    from utils.services import status
-
-    if not status.ollama:
-        return {"error": f"[Ollama is not available. {status.ollama_message}]"}
+    llm_ok, llm_error = _check_llm_available()
+    if not llm_ok:
+        return {"error": f"[{llm_error}]"}
 
     if not entry_data:
         return {"error": "Not enough journal data for Baustellen analysis."}
@@ -1082,10 +1088,9 @@ def generate_daily_question(recent_summaries):
         dict with key: question (string)
         or dict with key: error (string)
     """
-    from utils.services import status
-
-    if not status.ollama:
-        return {"error": f"[Ollama is not available. {status.ollama_message}]"}
+    llm_ok, llm_error = _check_llm_available()
+    if not llm_ok:
+        return {"error": f"[{llm_error}]"}
 
     if not recent_summaries:
         return {"error": "No recent entries to generate a personalized question."}
@@ -1123,11 +1128,11 @@ def suggest_tags(content, max_tags=7):
             - "confidence": float (0.0-1.0) based on content length/quality
             - "error": error message if AI unavailable
     """
-    from utils.services import status
     from config import Config
 
-    if not status.ollama:
-        return {"error": f"[Ollama is not available. {status.ollama_message}]"}
+    llm_ok, llm_error = _check_llm_available()
+    if not llm_ok:
+        return {"error": f"[{llm_error}]"}
 
     if not content or len(content.strip()) < Config.TAG_MIN_LENGTH:
         return {
