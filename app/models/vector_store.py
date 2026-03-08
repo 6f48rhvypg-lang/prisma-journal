@@ -2,6 +2,7 @@ import logging
 import os
 from datetime import datetime, timedelta
 from functools import lru_cache
+from typing import Any, cast
 
 from config import Config
 from database.db import save_embedding
@@ -146,7 +147,7 @@ def search_similar(query, n_results=5):
         return []
     # Use cached embedding for queries
     cached_embedding = _cached_query_embedding(query)
-    query_kwargs = {
+    query_kwargs: dict[str, Any] = {
         "n_results": min(n_results, collection.count()),
     }
     if cached_embedding:
@@ -154,16 +155,24 @@ def search_similar(query, n_results=5):
     else:
         query_kwargs["query_texts"] = [query]
 
-    results = collection.query(**query_kwargs)
+    results = cast(dict[str, Any], collection.query(**query_kwargs))
     entries = []
-    if results and results["ids"] and results["ids"][0]:
-        for i, doc_id in enumerate(results["ids"][0]):
+    ids = results.get("ids") or []
+    metadatas = results.get("metadatas") or []
+    documents = results.get("documents") or []
+    distances = results.get("distances") or []
+
+    if ids and ids[0]:
+        for i, doc_id in enumerate(ids[0]):
+            metadata = metadatas[0][i] if metadatas and metadatas[0] else {}
+            document = documents[0][i] if documents and documents[0] else ""
+            distance = distances[0][i] if distances and distances[0] else None
             entries.append(
                 {
                     "id": doc_id,
-                    "entry_id": results["metadatas"][0][i].get("entry_id"),
-                    "document": results["documents"][0][i] if results["documents"] else "",
-                    "distance": results["distances"][0][i] if results["distances"] else None,
+                    "entry_id": metadata.get("entry_id"),
+                    "document": document,
+                    "distance": distance,
                 }
             )
     return entries
@@ -186,7 +195,7 @@ def search_semantic(query, n_results=10, include_scores=True):
 
     # Use cached embedding for queries
     cached_embedding = _cached_query_embedding(query)
-    query_kwargs = {
+    query_kwargs: dict[str, Any] = {
         "n_results": min(n_results, collection.count()),
         "include": ["documents", "metadatas", "distances"],
     }
@@ -195,22 +204,29 @@ def search_semantic(query, n_results=10, include_scores=True):
     else:
         query_kwargs["query_texts"] = [query]
 
-    results = collection.query(**query_kwargs)
+    results = cast(dict[str, Any], collection.query(**query_kwargs))
 
     entries = []
-    if results and results["ids"] and results["ids"][0]:
-        for i, doc_id in enumerate(results["ids"][0]):
-            distance = results["distances"][0][i] if results["distances"] else 0
+    ids = results.get("ids") or []
+    metadatas = results.get("metadatas") or []
+    documents = results.get("documents") or []
+    distances = results.get("distances") or []
+
+    if ids and ids[0]:
+        for i, _doc_id in enumerate(ids[0]):
+            metadata = metadatas[0][i] if metadatas and metadatas[0] else {}
+            document = documents[0][i] if documents and documents[0] else ""
+            distance = distances[0][i] if distances and distances[0] else 0
             # Convert cosine distance to similarity score (0-1, higher is better)
             # ChromaDB cosine distance is 0 for identical, 2 for opposite
             similarity = max(0, 1 - (distance / 2))
 
             entry_data = {
-                "entry_id": results["metadatas"][0][i].get("entry_id"),
+                "entry_id": metadata.get("entry_id"),
                 "distance": distance,
                 "similarity_score": round(similarity, 4),
-                "document": results["documents"][0][i] if results["documents"] else "",
-                "metadata": results["metadatas"][0][i] if results["metadatas"] else {},
+                "document": document,
+                "metadata": metadata,
             }
             entries.append(entry_data)
 
@@ -247,7 +263,7 @@ def find_similar_entries(text, n_results=5, exclude_entry_ids=None, exclude_rece
     else:
         query_embeddings = _embed_texts([text])
 
-    query_kwargs = {
+    query_kwargs: dict[str, Any] = {
         "n_results": fetch_count,
         "include": ["documents", "metadatas", "distances"],
     }
@@ -256,7 +272,7 @@ def find_similar_entries(text, n_results=5, exclude_entry_ids=None, exclude_rece
     else:
         query_kwargs["query_texts"] = [text]
 
-    results = collection.query(**query_kwargs)
+    results = cast(dict[str, Any], collection.query(**query_kwargs))
 
     exclude_ids = set(exclude_entry_ids or [])
     cutoff_date = None
@@ -264,9 +280,14 @@ def find_similar_entries(text, n_results=5, exclude_entry_ids=None, exclude_rece
         cutoff_date = (datetime.now() - timedelta(days=exclude_recent_days)).isoformat()
 
     entries = []
-    if results and results["ids"] and results["ids"][0]:
-        for i, doc_id in enumerate(results["ids"][0]):
-            meta = results["metadatas"][0][i] if results["metadatas"] else {}
+    ids = results.get("ids") or []
+    metadatas = results.get("metadatas") or []
+    documents = results.get("documents") or []
+    distances = results.get("distances") or []
+
+    if ids and ids[0]:
+        for i, _doc_id in enumerate(ids[0]):
+            meta = metadatas[0][i] if metadatas and metadatas[0] else {}
             entry_id = meta.get("entry_id")
 
             # Skip excluded entries
@@ -276,17 +297,17 @@ def find_similar_entries(text, n_results=5, exclude_entry_ids=None, exclude_rece
             # Skip recent entries if cutoff specified
             if cutoff_date and meta.get("date"):
                 entry_date = meta.get("date", "")
-                if entry_date > cutoff_date:
+                if isinstance(entry_date, str) and entry_date > cutoff_date:
                     continue
 
-            distance = results["distances"][0][i] if results["distances"] else 0
+            distance = distances[0][i] if distances and distances[0] else 0
             similarity = max(0, 1 - (distance / 2))
 
             # Skip very low similarity matches
             if similarity < 0.3:
                 continue
 
-            doc = results["documents"][0][i] if results["documents"] else ""
+            doc = documents[0][i] if documents and documents[0] else ""
             # Create excerpt (first 200 chars)
             excerpt = doc[:200] + "..." if len(doc) > 200 else doc
 
@@ -317,20 +338,25 @@ def get_all_entry_embeddings():
 
     # Get all entries (ChromaDB doesn't have a simple "get all" so we use a large limit)
     try:
-        results = collection.get(
-            include=["metadatas", "embeddings", "documents"],
+        results = cast(dict[str, Any], collection.get(
+            include=cast(Any, ["metadatas", "embeddings", "documents"]),
             limit=10000,
-        )
+        ))
     except Exception as e:
         log.warning("Failed to get all embeddings: %s", e)
         return []
 
     entries = []
-    if results and results["ids"]:
-        for i, doc_id in enumerate(results["ids"]):
-            meta = results["metadatas"][i] if results["metadatas"] else {}
-            embedding = results["embeddings"][i] if results.get("embeddings") is not None else None
-            document = results["documents"][i] if results.get("documents") is not None else ""
+    ids = results.get("ids") or []
+    metadatas = results.get("metadatas") or []
+    embeddings = results.get("embeddings") or []
+    documents = results.get("documents") or []
+
+    if ids:
+        for i, _doc_id in enumerate(ids):
+            meta = metadatas[i] if i < len(metadatas) else {}
+            embedding = embeddings[i] if i < len(embeddings) else None
+            document = documents[i] if i < len(documents) else ""
             entries.append({
                 "entry_id": meta.get("entry_id"),
                 "embedding": embedding,
