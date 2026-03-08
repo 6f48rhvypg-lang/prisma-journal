@@ -67,15 +67,27 @@ async function apiRequest(url, method = 'GET', body = null) {
 }
 
 /**
- * Format a date string for display.
+ * Format a date string for display based on current language.
+ * German: dd.mm.yyyy (e.g., 30.06.2026)
+ * English format: YYYY-MM-DD (e.g., 2026-06-30)
  */
 function formatDate(dateStr) {
     const d = new Date(dateStr);
-    return d.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-    });
+    const lang = window.APP_LANGUAGE || 'de';
+    
+    if (lang === 'de') {
+        // German format: DD.MM.YYYY
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${day}.${month}.${year}`;
+    } else {
+        // English format: YYYY-MM-DD
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
 }
 
 /**
