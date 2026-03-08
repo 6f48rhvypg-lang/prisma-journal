@@ -495,7 +495,7 @@ def _cosine_similarity(vec_a, vec_b):
 
 
 def _cluster_embeddings(records, similarity_threshold=0.78, max_records=200):
-    filtered = [r for r in records if r.get("embedding")]
+    filtered = [r for r in records if r.get("embedding") is not None]
     filtered.sort(key=lambda r: r.get("metadata", {}).get("date", ""), reverse=True)
     filtered = filtered[:max_records]
 
@@ -506,7 +506,7 @@ def _cluster_embeddings(records, similarity_threshold=0.78, max_records=200):
 
     for rec in filtered:
         emb = rec.get("embedding")
-        if not emb:
+        if emb is None:
             continue
         assigned = False
         for cluster in clusters:
@@ -1306,11 +1306,19 @@ def api_insights_big_five():
         date_to=date_to,
     )
     summaries = [_entry_summary_snippet(e) for e in entries if e.get("content")]
+    
+    # Only analyze if there are sufficient entries
+    if len(summaries) < 3:
+        return jsonify({
+            "error": "Not enough entries for analysis",
+            "message": "Mindestens 3 Einträge erforderlich für eine Big Five Analyse"
+        }), 200
+    
     label = "Gesamt" if not date_from else f"Letzte {range_value} Tage"
     result = generate_big_five_analysis(summaries, label)
 
     if "error" in result:
-        status_code = 503 if "Ollama" in result["error"] else 400
+        status_code = 503 if "not available" in result["error"].lower() else 400
         return jsonify(result), status_code
 
     # Cache the successful result
@@ -1364,11 +1372,19 @@ def api_insights_baustellen():
                 "emotions": [em.get("emotion") for em in e.get("emotions", [])]
             })
     
+    # Only analyze if there are sufficient entries
+    if len(entry_data) < 5:
+        return jsonify({
+            "baustellen": [],
+            "message": "Mindestens 5 Einträge erforderlich für Baustellen-Analyse"
+        })
+    
     # Generate Baustellen analysis
     result = generate_baustellen_analysis(entry_data)
     
     if "error" in result:
-        status_code = 503 if "Ollama" in result["error"] else 400
+        error_text = str(result.get("error", ""))
+        status_code = 503 if "not available" in error_text.lower() else 400
         return jsonify(result), status_code
     
     # Cache successful result
@@ -1408,9 +1424,14 @@ def api_recurring_topics():
             "examples": examples,
         })
 
+    # Only analyze if there are topics to process
+    if not topic_inputs:
+        return jsonify({"topics": []})
+
     result = generate_recurring_topics(topic_inputs)
     if "error" in result:
-        status_code = 503 if "Ollama" in result["error"] else 400
+        error_text = str(result.get("error", ""))
+        status_code = 503 if "not available" in error_text.lower() else 400
         return jsonify(result), status_code
     return jsonify(result)
 
@@ -2375,7 +2396,8 @@ def api_analyze_baustellen():
                 log.warning("Failed to cache Baustellen analysis: %s", e)
     
     if "error" in result:
-        status_code = 503 if "Ollama" in result["error"] else 400
+        error_text = str(result.get("error", ""))
+        status_code = 503 if "not available" in error_text.lower() else 400
         return jsonify(result), status_code
     
     baustellen_data_raw = result.get("baustellen", [])

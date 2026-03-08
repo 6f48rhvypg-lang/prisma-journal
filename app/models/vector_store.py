@@ -74,8 +74,12 @@ def _get_collection():
             return None
         try:
             import chromadb
+            from chromadb.config import Settings
             os.makedirs(Config.CHROMA_PATH, exist_ok=True)
-            _client = chromadb.PersistentClient(path=Config.CHROMA_PATH)
+            _client = chromadb.PersistentClient(
+                path=Config.CHROMA_PATH,
+                settings=Settings(anonymized_telemetry=False),
+            )
             _collection = _client.get_or_create_collection(
                 name=Config.CHROMA_COLLECTION,
                 metadata={"hnsw:space": "cosine"},
@@ -325,8 +329,8 @@ def get_all_entry_embeddings():
     if results and results["ids"]:
         for i, doc_id in enumerate(results["ids"]):
             meta = results["metadatas"][i] if results["metadatas"] else {}
-            embedding = results["embeddings"][i] if results.get("embeddings") else None
-            document = results["documents"][i] if results.get("documents") else ""
+            embedding = results["embeddings"][i] if results.get("embeddings") is not None else None
+            document = results["documents"][i] if results.get("documents") is not None else ""
             entries.append({
                 "entry_id": meta.get("entry_id"),
                 "embedding": embedding,

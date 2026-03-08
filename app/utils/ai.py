@@ -365,7 +365,7 @@ def _make_lmstudio_request(url, payload, timeout):
         return None, f"[Error: {e}]"
 
 
-def chat_with_ollama(prompt, system_prompt=None, model=None, retry=True, timeout=None):
+def chat_with_ollama(prompt, system_prompt=None, model=None, retry=True, timeout=None) -> str:
     """Send a prompt to the configured LLM provider (Ollama or LM Studio) and return the response text.
 
     Includes retry logic for transient failures with exponential backoff.
@@ -380,16 +380,18 @@ def chat_with_ollama(prompt, system_prompt=None, model=None, retry=True, timeout
     Returns:
         Response text on success, or error message string starting with "[Error"
     """
-    from utils.services import status
-
     # Route to the appropriate provider based on config
     if Config.LLM_PROVIDER == "lmstudio":
-        return _chat_with_lmstudio(prompt, system_prompt, model, retry, timeout)
+        response = _chat_with_lmstudio(prompt, system_prompt, model, retry, timeout)
     else:
-        return _chat_with_ollama(prompt, system_prompt, model, retry, timeout)
+        response = _chat_with_ollama(prompt, system_prompt, model, retry, timeout)
+
+    if isinstance(response, str):
+        return response
+    return "[Error: Empty response from LLM provider.]"
 
 
-def _chat_with_ollama(prompt, system_prompt=None, model=None, retry=True, timeout=None):
+def _chat_with_ollama(prompt, system_prompt=None, model=None, retry=True, timeout=None) -> str:
     """Internal function for Ollama API calls."""
     from utils.services import status
 
@@ -425,11 +427,11 @@ def _chat_with_ollama(prompt, system_prompt=None, model=None, retry=True, timeou
         last_error = error
 
         # Don't retry connection errors that indicate Ollama isn't running
-        if "[Error: Cannot connect" in error:
+        if error and "[Error: Cannot connect" in error:
             break
 
         # Don't retry 404 (model not found)
-        if "not found in Ollama" in error:
+        if error and "not found in Ollama" in error:
             break
 
         # Retry with backoff for other errors
@@ -442,10 +444,10 @@ def _chat_with_ollama(prompt, system_prompt=None, model=None, retry=True, timeou
             time.sleep(delay)
 
     log.error("Ollama request failed after %d attempts: %s", max_attempts, last_error)
-    return last_error
+    return last_error or "[Error: Unknown Ollama error.]"
 
 
-def _chat_with_lmstudio(prompt, system_prompt=None, model=None, retry=True, timeout=None):
+def _chat_with_lmstudio(prompt, system_prompt=None, model=None, retry=True, timeout=None) -> str:
     """Internal function for LM Studio (OpenAI-compatible) API calls."""
     from utils.services import status
 
@@ -486,11 +488,11 @@ def _chat_with_lmstudio(prompt, system_prompt=None, model=None, retry=True, time
         last_error = error
 
         # Don't retry connection errors
-        if "[Error: Cannot connect" in error:
+        if error and "[Error: Cannot connect" in error:
             break
 
         # Don't retry 404 (model not found)
-        if "not found in LM Studio" in error:
+        if error and "not found in LM Studio" in error:
             break
 
         # Retry with backoff for other errors
@@ -503,7 +505,7 @@ def _chat_with_lmstudio(prompt, system_prompt=None, model=None, retry=True, time
             time.sleep(delay)
 
     log.error("LM Studio request failed after %d attempts: %s", max_attempts, last_error)
-    return last_error
+    return last_error or "[Error: Unknown LM Studio error.]"
 
 
 def analyze_entry(content):
@@ -600,7 +602,7 @@ def generate_deeper_questions(text, previous_questions=None):
 # JSON Parsing Helper
 # ---------------------------------------------------------------------------
 
-def _parse_json_response(response, expected_type="object"):
+def _parse_json_response(response: str, expected_type="object"):
     """Parse JSON from AI response, handling common formatting issues.
 
     Args:
@@ -685,6 +687,8 @@ def generate_summary_and_title(content):
     data, error = _parse_json_response(response, "object")
     if error:
         return {"error": error}
+    if not isinstance(data, dict):
+        return {"error": "AI returned unexpected JSON format (expected object)."}
 
     return {
         "title": data.get("title", "Untitled Entry"),
@@ -715,6 +719,8 @@ def detect_emotions(content):
     data, error = _parse_json_response(response, "object")
     if error:
         return {"error": error}
+    if not isinstance(data, dict):
+        return {"error": "AI returned unexpected JSON format (expected object)."}
 
     emotions = data.get("emotions", [])
     # Validate and clean emotions
@@ -971,6 +977,8 @@ def generate_big_five_analysis(entry_summaries, timeframe_label):
     data, error = _parse_json_response(response, "object")
     if error:
         return {"error": error}
+    if not isinstance(data, dict):
+        return {"error": "AI returned unexpected JSON format (expected object)."}
 
     return {
         "openness": data.get("openness", {}),
@@ -1010,6 +1018,8 @@ def generate_recurring_topics(topic_inputs):
     data, error = _parse_json_response(response, "array")
     if error:
         return {"error": error}
+    if not isinstance(data, list):
+        return {"error": "AI returned unexpected JSON format (expected array)."}
 
     topics = []
     for item in data:
@@ -1060,6 +1070,8 @@ def generate_baustellen_analysis(entry_data):
     data, error = _parse_json_response(response, "array")
     if error:
         return {"error": error}
+    if not isinstance(data, list):
+        return {"error": "AI returned unexpected JSON format (expected array)."}
 
     baustellen = []
     for item in data:

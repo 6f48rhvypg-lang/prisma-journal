@@ -54,13 +54,13 @@
 ## ✅ Completed
 
 ### Recently Done
-- **LM Studio Support** (Timo)
+- **LM Studio Support**
   - Added LM Studio as alternative LLM provider
   - OpenAI-compatible API integration
   - Dual provider support (Ollama + LM Studio)
   - Provider selection in settings UI
 
-- **CLI Arguments** (Timo)
+- **CLI Arguments** 
   - Added `--ollama` and `--lmstudio` flags
   - Custom `--port` and `--host` options
   - Command-line provider override
@@ -71,6 +71,13 @@
   - Created `docs/features/` for feature docs
   - Created `docs/setup/` for setup guides
   - Updated README with doc links
+
+- **Bug fixes/Other improvements**
+  - Dashboard insights now skip expensive AI analysis when not enough entries exist
+  - Prevented unnecessary Big Five, Baustellen, and recurring-topic generation on empty datasets
+  - Reduced dashboard load blocking by deferring external D3 CDN script loading
+  - Improved graceful fallback behavior when external CDN resources are unavailable
+  - Added dark mode support and integrated it into the UI experience
 
 ---
 
