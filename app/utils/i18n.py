@@ -319,6 +319,8 @@ TRANSLATIONS = {
         "ui.entry.regenerate_hint": "Creates a completely new variation",
         "ui.entry.artwork_empty": "Artwork will be generated automatically when you analyze this entry.",
         "ui.entry.upload_your_own": "Upload your own",
+        "ui.entry.choose_file": "Choose file",
+        "ui.entry.no_file_selected": "No file selected",
         "ui.entry.upload_image": "Upload Image",
         "ui.entry.related_entries": "Related Entries",
         "ui.entry.analyzing": "Analyzing...",
@@ -472,9 +474,34 @@ TRANSLATIONS = {
         "ui.settings.questions_one_per_line": "Questions (one per line)",
         "ui.settings.questions_hint": "We will convert each line into a framework question with placeholders.",
         "ui.settings.available_frameworks": "Available Frameworks",
+        "ui.settings.framework_name_placeholder": "Relationship Reset",
+        "ui.settings.framework_category_placeholder": "relationships",
+        "ui.settings.framework_description_placeholder": "A gentle reset for hard conversations.",
+        "ui.settings.framework_questions_placeholder": "What happened?\nWhat do I feel?\nWhat do I need?",
         "ui.settings.prompts_expand_hint": "Click a category to expand and edit prompts. Changes are saved individually.",
         "ui.settings.quick_reference": "Quick Reference:",
+        "ui.settings.ai_prompts_description": "Customize AI instructions organized by where they are used in the app.",
+        "ui.settings.legend_entry": "📓 Entry: Analysis, emotions, artwork",
+        "ui.settings.legend_dashboard": "🏠 Dashboard: Daily questions & suggestions",
+        "ui.settings.legend_insights": "📊 Insights: Pattern analysis",
+        "ui.settings.legend_chat": "💬 Chat: AI personas",
+        "ui.settings.save_prompt": "Save",
+        "ui.settings.reset_to_default": "Reset to Default",
+        "ui.settings.prompts_count_one": "{count} prompt",
+        "ui.settings.prompts_count_other": "{count} prompts",
         "ui.settings.unsaved": "Unsaved",
+        "ui.settings.category.entry": "📓 Journal Entry (Entry Creation & Analysis)",
+        "ui.settings.category_desc.entry": "Prompts used when creating entries, analyzing content, detecting emotions, and generating artwork. These affect the 'Finish Entry' flow and entry view page.",
+        "ui.settings.category.dashboard": "🏠 Dashboard (Daily Engagement)",
+        "ui.settings.category_desc.dashboard": "Prompts for the homepage features: daily reflection questions and personalized writing suggestions based on your journal history.",
+        "ui.settings.category.insights": "📊 Insights (Pattern Analysis)",
+        "ui.settings.category_desc.insights": "Prompts for the analytics page: Big Five personality analysis and recurring topic insights across multiple entries.",
+        "ui.settings.category.chat": "💬 AI Chat (Conversational Assistant)",
+        "ui.settings.category_desc.chat": "System prompts that define the AI's persona when chatting about entries (therapist mode) or analyzing patterns across entries (analyst mode).",
+        "ui.settings.category.image": "🎨 Image Generation (Artwork)",
+        "ui.settings.category_desc.image": "Prompts for generating images directly from entry content via the image generation API.",
+        "ui.settings.category.legacy": "🔧 Unused / Legacy",
+        "ui.settings.category_desc.legacy": "These prompts are not currently used in the application but are kept for compatibility or future features.",
         "ui.filter.date_from": "From",
         "ui.filter.date_to": "To",
         "ui.filter.emotions": "Emotions",
@@ -494,6 +521,32 @@ TRANSLATIONS = {
         "ui.ask.send": "Send",
         "error.load_failed": "Question could not be loaded",
         "error.new_question_failed": "New question could not be loaded",
+        
+        # Frameworks
+        "framework.morning_pages.name": "Morning Pages",
+        "framework.morning_pages.description": "Stream-of-consciousness writing to clear the mind.",
+        "framework.gratitude_practice.name": "Gratitude Practice",
+        "framework.gratitude_practice.description": "Focus on what you're thankful for and why it matters.",
+        "framework.cbt_thought_record.name": "CBT Thought Record",
+        "framework.cbt_thought_record.description": "Cognitive Behavioral Therapy structured thought analysis.",
+        "framework.stoic_reflection.name": "Stoic Reflection",
+        "framework.stoic_reflection.description": "Evening reflection inspired by Stoic philosophy.",
+        "framework.future_self.name": "Future Self",
+        "framework.future_self.description": "Write with your long-term self in mind.",
+        "framework.problem_solving.name": "Problem Solving",
+        "framework.problem_solving.description": "A practical structure for working through challenges.",
+        "framework.goal_setting.name": "Goal Setting",
+        "framework.goal_setting.description": "Clarify your goals and commit to the next action.",
+        "framework.relationship_reflection.name": "Relationship Reflection",
+        "framework.relationship_reflection.description": "Explore connection, needs, and communication.",
+        "framework.energy_audit.name": "Energy Audit",
+        "framework.energy_audit.description": "Track what fuels or drains your energy.",
+        "framework.creative_brainstorm.name": "Creative Brainstorm",
+        "framework.creative_brainstorm.description": "Generate ideas without judgment.",
+        "framework.fear_setting.name": "Fear Setting",
+        "framework.fear_setting.description": "Explore the cost of fear and the upside of action.",
+        "framework.weekly_review.name": "Weekly Review",
+        "framework.weekly_review.description": "Reflect on the week to close loops and reset.",
         
         # Status Page
         "ui.status.title": "System Status",
@@ -564,23 +617,83 @@ TRANSLATIONS = {
         "ui.status.fail": "FAIL",
         "ui.status.error_running_tests": "Error running tests:",
         
+        # Service Names
+        "service.ollama.name": "Ollama (LLM)",
+        "service.lmstudio.name": "LM Studio (LLM)",
+        "service.whisper.name": "Whisper (Voice)",
+        "service.chromadb.name": "ChromaDB (Vector Store)",
+        "service.embeddings.name": "Sentence-Transformers (Embeddings)",
+        "service.stable_diffusion.name": "Stable Diffusion (Images)",
+        "service.database.name": "SQLite Database",
+        
         # Service Status Messages - Ollama
         "service.ollama.cannot_connect": "Cannot connect to Ollama",
+        "service.ollama.cannot_connect_url": "Cannot connect to Ollama at {url}. Install from https://ollama.ai and run: ollama serve",
         "service.ollama.connection_timeout": "Connection timed out",
+        "service.ollama.timeout_url": "Ollama at {url} timed out",
+        "service.ollama.check_failed": "Ollama check failed: {error}",
         "service.ollama.connected_model_available": "Connected — model '{model}' available",
+        "service.ollama.connected_models_count": "Connected - {count} model(s) available",
+        "service.ollama.no_models_connected": "Connected, but no models installed",
         "service.ollama.no_models": "Ollama is running but has no models pulled. Run: ollama pull {model}",
+        "service.ollama.model_not_found_short": "Connected, but model '{model}' not found",
         "service.ollama.model_not_found": "Ollama is running but model '{model}' not found. Available: {available}. Run: ollama pull {model}",
+        "service.ollama.model_not_found_with_run": "Ollama is running but model '{model}' not found. Available: {available}. Run: ollama pull {model}",
         
         # Service Status Messages - LM Studio
         "service.lmstudio.cannot_connect": "Cannot connect to LM Studio",
+        "service.lmstudio.cannot_connect_url": "Cannot connect to LM Studio at {url}. Ensure LM Studio is running with the local server enabled.",
+        "service.lmstudio.timeout_url": "LM Studio at {url} timed out",
+        "service.lmstudio.check_failed": "LM Studio check failed: {error}",
         "service.lmstudio.connected_model_available": "Connected - model '{model}' available",
         "service.lmstudio.no_models_loaded": "Connected, but no models loaded",
+        "service.lmstudio.no_models_loaded_url": "LM Studio at {url} is running but has no models loaded. Load a model in LM Studio.",
         "service.lmstudio.model_not_found": "Connected, but configured model '{model}' not found",
         "service.lmstudio.models_available_set": "LM Studio is running. Available models: {models}. Set LMSTUDIO_MODEL to match.",
         
         # Service Status Messages - Whisper
+        "service.whisper.installed_model_ready": "Installed - '{model}' model ready",
         "service.whisper.installed": "Installed — will use '{model}' model (loaded on first use)",
+        "service.whisper.not_installed_short": "openai-whisper not installed",
         "service.whisper.not_installed": "openai-whisper is not installed. Run: pip install openai-whisper  (also requires ffmpeg)",
+        "service.whisper.ffmpeg_warning": "(ffmpeg not found - some formats may fail)",
+        
+        # Service Status Messages - ChromaDB
+        "service.chromadb.operational_one": "Operational - {count} document indexed",
+        "service.chromadb.operational_other": "Operational - {count} documents indexed",
+        "service.chromadb.connected_collection": "Connected — collection '{collection}' at {path}",
+        "service.chromadb.not_installed": "chromadb not installed",
+        "service.chromadb.not_installed_pip": "chromadb is not installed. Run: pip install chromadb",
+        "service.chromadb.init_failed": "ChromaDB initialisation failed: {error}",
+        
+        # Service Status Messages - Embeddings
+        "service.embeddings.installed_model": "Installed - model: {model}",
+        "service.embeddings.installed_model_first_use": "Installed — model '{model}' (downloaded on first use)",
+        "service.embeddings.not_installed": "sentence-transformers not installed",
+        "service.embeddings.not_installed_pip": "sentence-transformers is not installed. Run: pip install sentence-transformers",
+        
+        # Service Status Messages - Stable Diffusion
+        "service.sd.disabled": "Disabled in configuration",
+        "service.sd.disabled_detail": "Disabled in configuration (SD_ENABLED=false)",
+        "service.sd.connected_models_count": "Connected - {count} model(s) available",
+        "service.sd.connected_models_count_url": "Connected — {count} model(s) available at {url}",
+        "service.sd.cannot_connect": "Cannot connect to Stable Diffusion WebUI",
+        "service.sd.cannot_connect_url": "Cannot connect to Stable Diffusion at {url}. Start the WebUI with --api flag.",
+        "service.sd.connection_timeout": "Connection timed out",
+        "service.sd.timeout_url": "Stable Diffusion at {url} timed out",
+        "service.sd.check_failed": "Stable Diffusion check failed: {error}",
+        
+        # Service Status Messages - Database
+        "service.database.operational": "Operational - {count} entries",
+        "service.database.not_found": "Database file not found (will be created on first use)",
+        
+        # Service Status Messages - FLUX
+        "service.flux.disabled": "Disabled in configuration",
+        "service.flux.no_models": "Ollama connected, but no FLUX models found",
+        "service.flux.available_via": "FLUX available via '{model}'",
+        "service.flux.model_ready": "Connected - FLUX model '{model}' ready",
+        "service.flux.cannot_connect": "Cannot connect to Ollama",
+        "service.flux.connection_timeout": "Connection timed out",
         
         # Setup Instructions - Ollama
         "setup.ollama.install": "Install Ollama from https://ollama.ai",
@@ -662,6 +775,21 @@ TRANSLATIONS = {
         
         # Setup Wizard
         "ui.setup.semantic_search_desc": "Use semantic search to find entries by meaning, not just keywords.",
+        
+        # Emotions (Plutchik's wheel)
+        "emotions.joy": "joy",
+        "emotions.trust": "trust",
+        "emotions.fear": "fear",
+        "emotions.surprise": "surprise",
+        "emotions.sadness": "sadness",
+        "emotions.disgust": "disgust",
+        "emotions.anger": "anger",
+        "emotions.anticipation": "anticipation",
+        
+        # Emotion intensity levels
+        "intensity.low": "low",
+        "intensity.medium": "medium",
+        "intensity.high": "high",
     },
     
     # German translations
@@ -981,6 +1109,8 @@ TRANSLATIONS = {
         "ui.entry.regenerate_hint": "Erstellt eine komplett neue Variation",
         "ui.entry.artwork_empty": "Artwork wird automatisch generiert, wenn du diesen Eintrag analysierst.",
         "ui.entry.upload_your_own": "Eigenes hochladen",
+        "ui.entry.choose_file": "Datei auswählen",
+        "ui.entry.no_file_selected": "Keine Datei ausgewählt",
         "ui.entry.upload_image": "Bild hochladen",
         "ui.entry.related_entries": "Verwandte Einträge",
         "ui.entry.analyzing": "Analysiere...",
@@ -1134,9 +1264,34 @@ TRANSLATIONS = {
         "ui.settings.questions_one_per_line": "Fragen (eine pro Zeile)",
         "ui.settings.questions_hint": "Jede Zeile wird in eine Framework-Frage mit Platzhaltern umgewandelt.",
         "ui.settings.available_frameworks": "Verfügbare Frameworks",
+        "ui.settings.framework_name_placeholder": "Beziehungs-Reset",
+        "ui.settings.framework_category_placeholder": "Beziehungen",
+        "ui.settings.framework_description_placeholder": "Ein sanfter Reset für schwierige Gespräche.",
+        "ui.settings.framework_questions_placeholder": "Was ist passiert?\nWas fühle ich?\nWas brauche ich?",
         "ui.settings.prompts_expand_hint": "Klicke eine Kategorie, um Prompts aufzuklappen und zu bearbeiten. Änderungen werden einzeln gespeichert.",
         "ui.settings.quick_reference": "Schnellreferenz:",
+        "ui.settings.ai_prompts_description": "Passe KI-Anweisungen an, organisiert nach ihrer Verwendung in der App.",
+        "ui.settings.legend_entry": "📓 Eintrag: Analyse, Emotionen, Artwork",
+        "ui.settings.legend_dashboard": "🏠 Dashboard: Tägliche Fragen & Vorschläge",
+        "ui.settings.legend_insights": "📊 Einblicke: Musteranalyse",
+        "ui.settings.legend_chat": "💬 Chat: KI-Personas",
+        "ui.settings.save_prompt": "Speichern",
+        "ui.settings.reset_to_default": "Auf Standard zurücksetzen",
+        "ui.settings.prompts_count_one": "{count} Prompt",
+        "ui.settings.prompts_count_other": "{count} Prompts",
         "ui.settings.unsaved": "Ungespeichert",
+        "ui.settings.category.entry": "📓 Tagebucheintrag (Erstellung & Analyse)",
+        "ui.settings.category_desc.entry": "Prompts zur Eintragsberarbeitung, Inhaltsanalyse, Emotionserkennung und Artwork-Generierung. Diese beeinflussen den 'Eintrag abschließen'-Flow und die Eintragsansicht.",
+        "ui.settings.category.dashboard": "🏠 Dashboard (Tägliche Aktivitäten)",
+        "ui.settings.category_desc.dashboard": "Prompts für die Startseiten-Features: tägliche Reflexionsfragen und personalisierte Schreibvorschläge basierend auf deinem Tagebuch.",
+        "ui.settings.category.insights": "📊 Einblicke (Musteranalyse)",
+        "ui.settings.category_desc.insights": "Prompts für die Analytics-Seite: Big-Five-Persönlichkeitsanalyse und wiederkehrende Themen-Insights über mehrere Einträge hinweg.",
+        "ui.settings.category.chat": "💬 KI-Chat (Konversationeller Assistent)",
+        "ui.settings.category_desc.chat": "System-Prompts, die die KI-Persona beim Chatten über Einträge (Therapeuten-Modus) oder beim Analysieren von Mustern (Analyst-Modus) definieren.",
+        "ui.settings.category.image": "🎨 Bildgenerierung (Artwork)",
+        "ui.settings.category_desc.image": "Prompts zur direkten Bildgenerierung aus Einträgen via Bildgenerungs-API.",
+        "ui.settings.category.legacy": "🔧 Ungenutzt / Veraltet",
+        "ui.settings.category_desc.legacy": "Diese Prompts werden derzeit in der Anwendung nicht verwendet, aber zur Kompatibilität oder zukünftigen Features beibehalten.",
         "ui.filter.date_from": "Von",
         "ui.filter.date_to": "Bis",
         "ui.filter.emotions": "Emotionen",
@@ -1156,6 +1311,32 @@ TRANSLATIONS = {
         "ui.ask.send": "Senden",
         "error.load_failed": "Frage konnte nicht geladen werden",
         "error.new_question_failed": "Neue Frage konnte nicht geladen werden",
+        
+        # Frameworks
+        "framework.morning_pages.name": "Morning Pages",
+        "framework.morning_pages.description": "Freies Schreiben ohne Zensur, um den Kopf freizumachen.",
+        "framework.gratitude_practice.name": "Dankbarkeitspraxis",
+        "framework.gratitude_practice.description": "Konzentriere dich auf das, wofür du dankbar bist und warum es wichtig ist.",
+        "framework.cbt_thought_record.name": "CBT-Gedankenprotokoll",
+        "framework.cbt_thought_record.description": "Strukturierte Gedankenanalyse nach kognitiver Verhaltenstherapie.",
+        "framework.stoic_reflection.name": "Stoische Reflexion",
+        "framework.stoic_reflection.description": "Abendliche Reflexion inspiriert von der Stoischen Philosophie.",
+        "framework.future_self.name": "Zukünftiges Selbst",
+        "framework.future_self.description": "Schreibe mit deinem langfristigen Selbst im Hinterkopf.",
+        "framework.problem_solving.name": "Problemlösung",
+        "framework.problem_solving.description": "Eine praktische Struktur zur Bewältigung von Herausforderungen.",
+        "framework.goal_setting.name": "Zielplanung",
+        "framework.goal_setting.description": "Kläre deine Ziele und verpflichte dich zur nächsten Aktion.",
+        "framework.relationship_reflection.name": "Beziehungsreflexion",
+        "framework.relationship_reflection.description": "Erkunde Verbundenheit, Bedürfnisse und Kommunikation.",
+        "framework.energy_audit.name": "Energieaudit",
+        "framework.energy_audit.description": "Verfolge, was deine Energie lädt oder entlädt.",
+        "framework.creative_brainstorm.name": "Kreatives Brainstorming",
+        "framework.creative_brainstorm.description": "Ideen generieren ohne Bewertung.",
+        "framework.fear_setting.name": "Angststudie",
+        "framework.fear_setting.description": "Erkunde die Kosten der Angst und das Aufwärtspotenzial von Handlung.",
+        "framework.weekly_review.name": "Wochenrückblick",
+        "framework.weekly_review.description": "Reflektiere auf die Woche, um Schleifen zu schließen und zurückzusetzen.",
         
         # Status Page
         "ui.status.title": "Systemstatus",
@@ -1215,21 +1396,72 @@ TRANSLATIONS = {
         
         # Service Status Messages - Ollama
         "service.ollama.cannot_connect": "Verbindung zu Ollama nicht möglich",
+        "service.ollama.cannot_connect_url": "Verbindung zu Ollama bei {url} nicht möglich. Installiere von https://ollama.ai und führe aus: ollama serve",
         "service.ollama.connection_timeout": "Zeitüberschreitung der Verbindung",
+        "service.ollama.timeout_url": "Ollama bei {url} Zeitüberschreitung",
+        "service.ollama.check_failed": "Ollama-Prüfung fehlgeschlagen: {error}",
         "service.ollama.connected_model_available": "Verbunden — Modell '{model}' verfügbar",
+        "service.ollama.connected_models_count": "Verbunden - {count} Modell(e) verfügbar",
+        "service.ollama.no_models_connected": "Verbunden, aber keine Modelle installiert",
         "service.ollama.no_models": "Ollama läuft, aber es wurden keine Modelle heruntergeladen. Führe aus: ollama pull {model}",
+        "service.ollama.model_not_found_short": "Verbunden, aber Modell '{model}' nicht gefunden",
         "service.ollama.model_not_found": "Ollama läuft, aber Modell '{model}' nicht gefunden. Verfügbar: {available}. Führe aus: ollama pull {model}",
+        "service.ollama.model_not_found_with_run": "Ollama läuft, aber Modell '{model}' nicht gefunden. Verfügbar: {available}. Führe aus: ollama pull {model}",
         
         # Service Status Messages - LM Studio
         "service.lmstudio.cannot_connect": "Verbindung zu LM Studio nicht möglich",
+        "service.lmstudio.cannot_connect_url": "Verbindung zu LM Studio bei {url} nicht möglich. Stelle sicher, dass LM Studio mit aktiviertem Local Server läuft.",
+        "service.lmstudio.timeout_url": "LM Studio bei {url} Zeitüberschreitung",
+        "service.lmstudio.check_failed": "LM Studio-Prüfung fehlgeschlagen: {error}",
         "service.lmstudio.connected_model_available": "Verbunden - Modell '{model}' verfügbar",
         "service.lmstudio.no_models_loaded": "Verbunden, aber keine Modelle geladen",
+        "service.lmstudio.no_models_loaded_url": "LM Studio bei {url} läuft, aber keine Modelle geladen. Lade ein Modell in LM Studio.",
         "service.lmstudio.model_not_found": "Verbunden, aber konfiguriertes Modell '{model}' nicht gefunden",
         "service.lmstudio.models_available_set": "LM Studio läuft. Verfügbare Modelle: {models}. Setze LMSTUDIO_MODEL entsprechend.",
         
         # Service Status Messages - Whisper
+        "service.whisper.installed_model_ready": "Installiert - Modell '{model}' bereit",
         "service.whisper.installed": "Installiert — wird Modell '{model}' verwenden (wird bei erster Verwendung geladen)",
+        "service.whisper.not_installed_short": "openai-whisper nicht installiert",
         "service.whisper.not_installed": "openai-whisper ist nicht installiert. Führe aus: pip install openai-whisper  (benötigt auch ffmpeg)",
+        "service.whisper.ffmpeg_warning": "(ffmpeg nicht gefunden - einige Formate könnten fehlschlagen)",
+        
+        # Service Status Messages - ChromaDB
+        "service.chromadb.operational_one": "Betriebsbereit - {count} Dokument indexiert",
+        "service.chromadb.operational_other": "Betriebsbereit - {count} Dokumente indexiert",
+        "service.chromadb.connected_collection": "Verbunden — Sammlung '{collection}' bei {path}",
+        "service.chromadb.not_installed": "chromadb nicht installiert",
+        "service.chromadb.not_installed_pip": "chromadb ist nicht installiert. Führe aus: pip install chromadb",
+        "service.chromadb.init_failed": "ChromaDB-Initialisierung fehlgeschlagen: {error}",
+        
+        # Service Status Messages - Embeddings
+        "service.embeddings.installed_model": "Installiert - Modell: {model}",
+        "service.embeddings.installed_model_first_use": "Installiert — Modell '{model}' (wird bei erster Verwendung heruntergeladen)",
+        "service.embeddings.not_installed": "sentence-transformers nicht installiert",
+        "service.embeddings.not_installed_pip": "sentence-transformers ist nicht installiert. Führe aus: pip install sentence-transformers",
+        
+        # Service Status Messages - Stable Diffusion
+        "service.sd.disabled": "In Konfiguration deaktiviert",
+        "service.sd.disabled_detail": "In Konfiguration deaktiviert (SD_ENABLED=false)",
+        "service.sd.connected_models_count": "Verbunden - {count} Modell(e) verfügbar",
+        "service.sd.connected_models_count_url": "Verbunden — {count} Modell(e) verfügbar bei {url}",
+        "service.sd.cannot_connect": "Verbindung zu Stable Diffusion WebUI nicht möglich",
+        "service.sd.cannot_connect_url": "Verbindung zu Stable Diffusion bei {url} nicht möglich. Starte WebUI mit --api Flag.",
+        "service.sd.connection_timeout": "Zeitüberschreitung der Verbindung",
+        "service.sd.timeout_url": "Stable Diffusion bei {url} Zeitüberschreitung",
+        "service.sd.check_failed": "Stable Diffusion-Prüfung fehlgeschlagen: {error}",
+        
+        # Service Status Messages - Database
+        "service.database.operational": "Betriebsbereit - {count} Einträge",
+        "service.database.not_found": "Datenbankdatei nicht gefunden (wird bei erster Verwendung erstellt)",
+        
+        # Service Status Messages - FLUX
+        "service.flux.disabled": "In Konfiguration deaktiviert",
+        "service.flux.no_models": "Ollama verbunden, aber keine FLUX-Modelle gefunden",
+        "service.flux.available_via": "FLUX verfügbar via '{model}'",
+        "service.flux.model_ready": "Verbunden - FLUX-Modell '{model}' bereit",
+        "service.flux.cannot_connect": "Verbindung zu Ollama nicht möglich",
+        "service.flux.connection_timeout": "Zeitüberschreitung der Verbindung",
         
         # Setup Instructions - Ollama (German)
         "setup.ollama.step1": "Installiere Ollama von https://ollama.ai",
@@ -1260,7 +1492,16 @@ TRANSLATIONS = {
         "ui.status.fail": "FEHLGESCHLAGEN",
         "ui.status.error_running_tests": "Fehler beim Ausführen der Tests:",
         
-        # Setup Instructions - Ollama
+        # Service Names (German)
+        "service.ollama.name": "Ollama (LLM)",
+        "service.lmstudio.name": "LM Studio (LLM)",
+        "service.whisper.name": "Whisper (Spracherkennung)",
+        "service.chromadb.name": "ChromaDB (Vektorspeicher)",
+        "service.embeddings.name": "Sentence-Transformers (Embeddings)",
+        "service.stable_diffusion.name": "Stable Diffusion (Bilder)",
+        "service.database.name": "SQLite-Datenbank",
+        
+        # Service Status Messages - Ollama (German)
         "setup.ollama.install": "Installiere Ollama von https://ollama.ai",
         "setup.ollama.start_server": "Starte den Server: ollama serve",
         "setup.ollama.pull_model": "Lade ein Modell herunter: ollama pull llama3.2",
@@ -1327,6 +1568,21 @@ TRANSLATIONS = {
         
         # Setup Wizard
         "ui.setup.semantic_search_desc": "Verwende die semantische Suche, um Einträge nach Bedeutung zu finden, nicht nur nach Stichwörtern.",
+        
+        # Emotions (Plutchik's wheel)
+        "emotions.joy": "Freude",
+        "emotions.trust": "Vertrauen",
+        "emotions.fear": "Angst",
+        "emotions.surprise": "Überraschung",
+        "emotions.sadness": "Traurigkeit",
+        "emotions.disgust": "Ekel",
+        "emotions.anger": "Wut",
+        "emotions.anticipation": "Erwartung",
+        
+        # Emotion intensity levels
+        "intensity.low": "niedrig",
+        "intensity.medium": "mittel",
+        "intensity.high": "hoch",
     },
 }
 
