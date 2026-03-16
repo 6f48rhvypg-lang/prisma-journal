@@ -103,8 +103,8 @@ class Config:
     MAX_ENTRY_LENGTH = int(os.environ.get("MAX_ENTRY_LENGTH", "50000"))
 
     # -- LLM Provider Selection ---------------------------------------------
-    # Choose between "ollama" or "lmstudio"
-    LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "ollama").lower()
+    # Choose between "ollama", "lmstudio", or "auto" (detect at startup)
+    LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "auto").lower()
 
     # -- Ollama (LLM) -------------------------------------------------------
     OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")

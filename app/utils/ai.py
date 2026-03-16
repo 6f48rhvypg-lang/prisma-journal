@@ -955,7 +955,7 @@ def suggest_tags(content, max_tags=7):
     
     response = chat_with_ollama(
         truncated,
-        system_prompt=system_prompt.format(content=truncated),
+        system_prompt=system_prompt,
         model=tag_model,
         timeout=15  # Short timeout for fast response
     )
