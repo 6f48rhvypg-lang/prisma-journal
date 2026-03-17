@@ -79,7 +79,7 @@ For new features:
 
 ## Architecture Overview
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for details on:
+See [ARCHITECTURE.md](../architecture/ARCHITECTURE.md) for details on:
 - Project structure
 - Database schema
 - Service integrations
