@@ -5,7 +5,7 @@
 <div class="max-w-3xl mx-auto">
     <!-- Header -->
     <div class="mb-8">
-        <h1 class="text-3xl font-bold text-surface-900">{{ entry.title or t('ui.entry.journal_entry') }}</h1>
+        <h1 class="text-3xl font-bold text-surface-900 dark:text-white">{{ entry.title or t('ui.entry.journal_entry') }}</h1>
 
         <div class="flex flex-wrap items-center gap-2 mt-3 sm:justify-end">
             <a href="/ask?entry_id={{ entry.id }}" class="bg-surface-900 text-white text-sm font-medium px-4 py-2 rounded-lg transition">{{ t('ui.entry.discuss') }}</a>
