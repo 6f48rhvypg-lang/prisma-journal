@@ -347,7 +347,8 @@
         concernsPromptStatusTemplate: {{ t('ui.dashboard.concerns.prompt_status', headline='__HEADLINE__', status='__STATUS__') | tojson }},
         concernsCreateFailed: {{ t('ui.dashboard.concerns.create_failed', default='Could not create concern') | tojson }},
         concernsNameRequired: {{ t('ui.dashboard.concerns.name_required', default='Please enter a name') | tojson }},
-        concernsLinkedEntries: {{ t('ui.dashboard.concerns.linked_entries', count='__COUNT__', default='__COUNT__ entries linked') | tojson }}
+        concernsLinkedEntries: {{ t('ui.dashboard.concerns.linked_entries', count='__COUNT__', default='__COUNT__ entries linked') | tojson }},
+        concernsNeedsMoreEntries: {{ t('ui.dashboard.concerns.needs_more_entries', needed='__NEEDED__', count='__COUNT__', required='__REQUIRED__', default='Write __NEEDED__ more entries to unlock pattern analysis. (__COUNT__/__REQUIRED__)') | tojson }}
     };
 
     // ── Emotion colors ─────────────────────────────────────────────
@@ -472,6 +473,8 @@
         baustellen: [],
         currentFilter: 'active',
         isLoading: false,
+        totalEntryCount: 0,
+        minEntriesRequired: 5,
 
         async load() {
             const container = document.getElementById('baustellen-content');
@@ -485,8 +488,10 @@
             try {
                 const resp = await fetch('/api/baustellen');
                 const data = await resp.json();
-                
+
                 this.baustellen = data.baustellen || [];
+                this.totalEntryCount = data.total_entry_count ?? 0;
+                this.minEntriesRequired = data.min_entries_required ?? 5;
                 this.render();
             } catch (e) {
                 console.error('Failed to load Baustellen:', e);
@@ -532,10 +537,28 @@
                 let msg = i18n.concernsEmpty;
                 if (this.currentFilter === 'active') msg = i18n.concernsEmptyActive;
                 if (this.currentFilter === 'closed') msg = i18n.concernsEmptyArchived;
-                
+
+                // Show entry-count hint when there aren't enough entries yet
+                const needed = this.minEntriesRequired - this.totalEntryCount;
+                let entryHint = '';
+                if (this.baustellen.length === 0 && needed > 0) {
+                    const hintText = i18n.concernsNeedsMoreEntries
+                        .replace('__NEEDED__', needed)
+                        .replace('__COUNT__', this.totalEntryCount)
+                        .replace('__REQUIRED__', this.minEntriesRequired);
+                    const pct = Math.round((this.totalEntryCount / this.minEntriesRequired) * 100);
+                    entryHint = `
+                        <div class="mt-3 flex flex-col items-center gap-2">
+                            <div class="w-full max-w-[180px] h-1.5 rounded-full bg-surface-200 dark:bg-surface-600">
+                                <div class="h-full rounded-full bg-primary-400 dark:bg-primary-500 transition-all" style="width:${pct}%"></div>
+                            </div>
+                            <span class="text-[10px] text-surface-400">${hintText}</span>
+                        </div>`;
+                }
+
                 container.innerHTML = `
                     <div class="text-xs text-surface-400 text-center py-8">
-                        ${msg}
+                        ${msg}${entryHint}
                     </div>
                 `;
                 return;

@@ -2093,19 +2093,24 @@ def api_popular_tags():
 @app.route("/api/baustellen", methods=["GET"])
 def api_list_baustellen():
     """List all Baustellen, optionally filtered by status."""
-    from database.db import get_all_baustellen
-    
+    from database.db import get_all_baustellen, get_entry_count
+
     status_filter = request.args.get("status")
     include_inactive = request.args.get("include_inactive", "false").lower() == "true"
     order_by = request.args.get("order_by", "pinned_first")
-    
+
     baustellen = get_all_baustellen(
         status=status_filter,
         include_inactive=include_inactive,
         order_by=order_by
     )
-    
-    return jsonify({"baustellen": baustellen, "count": len(baustellen)})
+
+    return jsonify({
+        "baustellen": baustellen,
+        "count": len(baustellen),
+        "total_entry_count": get_entry_count(),
+        "min_entries_required": 5,
+    })
 
 
 @app.route("/api/baustellen/<int:baustelle_id>", methods=["GET"])
