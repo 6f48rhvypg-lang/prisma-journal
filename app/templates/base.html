@@ -52,6 +52,8 @@
         }
         body { font-family: 'Inter', sans-serif; background: #f5f5f5; color: var(--ink); }
         :root.dark body { background: #0f172a; }
+        #app-bg { background-image: url('/static/images/Background_image.png'), linear-gradient(to bottom right, #f7f7f7, #f3f3f4, #ededee); }
+        :root.dark #app-bg { background-image: url('/static/images/Background_image_inverted.png'), linear-gradient(to bottom right, #0f172a, #1e293b, #0f172a); }
         body.ui-font-small { font-size: 14px; }
         body.ui-font-medium { font-size: 16px; }
         body.ui-font-large { font-size: 18px; }
@@ -151,7 +153,7 @@
     {% block head %}{% endblock %}
 </head>
 <body class="h-full text-surface-900 dark:text-surface-50 transition-colors duration-200 {{ ui_body_classes }}">
-    <div class="min-h-full flex" id="app-bg" style="background-image: url('/static/images/Background_image.png'), linear-gradient(to bottom right, #f7f7f7, #f3f3f4, #ededee); background-size: cover; background-position: center; background-attachment: fixed;">
+    <div class="min-h-full flex" id="app-bg" style="background-size: cover; background-position: center; background-attachment: fixed;">
         <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-64 -translate-x-full lg:translate-x-0 transition-transform duration-200 bg-white dark:bg-surface-800 border-r border-surface-200 dark:border-surface-700 sidebar-shadow">
             <div class="flex flex-col h-full px-5 py-6">
                 <div class="flex items-center justify-between">

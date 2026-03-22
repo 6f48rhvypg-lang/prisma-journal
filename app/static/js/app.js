@@ -8,15 +8,10 @@
     const lightIcon = document.getElementById('theme-light-icon');
     const darkIcon = document.getElementById('theme-dark-icon');
 
-    const bgEl = document.getElementById('app-bg');
-    const bgLight = "url('/static/images/Background_image.png'), linear-gradient(to bottom right, #f7f7f7, #f3f3f4, #ededee)";
-    const bgDark  = "url('/static/images/Background_image_inverted.png'), linear-gradient(to bottom right, #0f172a, #1e293b, #0f172a)";
-
     function updateIcons() {
         const isDark = document.documentElement.classList.contains('dark');
         if (lightIcon) lightIcon.classList.toggle('hidden', !isDark);
         if (darkIcon) darkIcon.classList.toggle('hidden', isDark);
-        if (bgEl) bgEl.style.backgroundImage = isDark ? bgDark : bgLight;
     }
 
     updateIcons();
