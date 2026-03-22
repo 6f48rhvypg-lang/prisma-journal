@@ -1800,6 +1800,17 @@ def api_delete_all_data():
     return jsonify({"deleted": True})
 
 
+@app.route("/api/settings/theme_mode", methods=["POST"])
+def api_settings_theme_mode():
+    """Update theme_mode setting (light/dark/auto) from the toggle button."""
+    data = request.get_json(silent=True) or {}
+    mode = data.get("theme_mode")
+    if mode not in ("light", "dark", "auto"):
+        return jsonify({"error": "invalid theme_mode"}), 400
+    set_setting("theme_mode", mode)
+    return jsonify({"theme_mode": mode})
+
+
 @app.route("/api/settings/export")
 def api_settings_export():
     """Export settings as JSON."""

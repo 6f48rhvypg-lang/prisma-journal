@@ -24,8 +24,14 @@
     if (toggle) {
         toggle.addEventListener('click', () => {
             const isDark = document.documentElement.classList.toggle('dark');
-            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            const mode = isDark ? 'dark' : 'light';
+            localStorage.setItem('theme', mode);
             updateIcons();
+            fetch('/api/settings/theme_mode', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ theme_mode: mode }),
+            }).catch(() => {});
         });
     }
 })();
