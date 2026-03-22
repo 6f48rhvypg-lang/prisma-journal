@@ -19,8 +19,14 @@
     if (toggle) {
         toggle.addEventListener('click', () => {
             const isDark = document.documentElement.classList.toggle('dark');
-            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            const mode = isDark ? 'dark' : 'light';
+            localStorage.setItem('theme', mode);
             updateIcons();
+            fetch('/api/settings/theme_mode', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ theme_mode: mode }),
+            }).catch(() => {});
         });
     }
 })();
@@ -726,3 +732,90 @@ window.AILoader = AILoader;
         prefetched.add(link.href);
     });
 })();
+
+
+// ---------------------------------------------------------------------------
+// Prompt Debug Mode
+// ---------------------------------------------------------------------------
+// Usage:
+//   Enable:  PromptDebug.enable()   (in browser console)
+//   Disable: PromptDebug.disable()
+//   Or add ?debug=prompts to any URL for a one-time session
+// ---------------------------------------------------------------------------
+
+const PromptDebug = {
+    isActive() {
+        return localStorage.getItem('promptDebug') === 'true' ||
+               new URLSearchParams(location.search).get('debug') === 'prompts';
+    },
+
+    enable() {
+        localStorage.setItem('promptDebug', 'true');
+        location.reload();
+    },
+
+    disable() {
+        localStorage.removeItem('promptDebug');
+        location.reload();
+    },
+
+    _tooltip: null,
+
+    _getTooltip() {
+        if (!this._tooltip) {
+            this._tooltip = document.createElement('div');
+            this._tooltip.id = 'prompt-debug-tooltip';
+            document.body.appendChild(this._tooltip);
+        }
+        return this._tooltip;
+    },
+
+    inject() {
+        const tooltip = this._getTooltip();
+
+        document.querySelectorAll('[data-prompt-key]').forEach(el => {
+            if (el.dataset.promptDebugDone) return;
+            el.dataset.promptDebugDone = '1';
+
+            const keys = el.dataset.promptKey.split(',').map(k => k.trim());
+            const badge = document.createElement('span');
+            badge.className = 'prompt-debug-badge';
+            badge.setAttribute('role', 'img');
+            badge.setAttribute('aria-label', 'Prompt key: ' + keys.join(', '));
+            badge.textContent = '?';
+
+            badge.addEventListener('mouseenter', () => {
+                tooltip.innerHTML =
+                    '<strong style="color:#a5b4fc">prompts.yaml</strong><br>' +
+                    keys.map(k => '→ ' + k).join('<br>');
+                tooltip.style.display = 'block';
+
+                const rect = badge.getBoundingClientRect();
+                const tw = tooltip.offsetWidth;
+                let left = rect.left + rect.width / 2 - tw / 2;
+                // keep within viewport
+                left = Math.max(8, Math.min(left, window.innerWidth - tw - 8));
+                tooltip.style.left = left + 'px';
+                tooltip.style.top = (rect.top - tooltip.offsetHeight - 8) + 'px';
+            });
+
+            badge.addEventListener('mouseleave', () => {
+                tooltip.style.display = 'none';
+            });
+
+            el.parentNode.insertBefore(badge, el.nextSibling);
+        });
+    },
+
+    init() {
+        if (!this.isActive()) return;
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => this.inject());
+        } else {
+            this.inject();
+        }
+    },
+};
+
+PromptDebug.init();
+window.PromptDebug = PromptDebug;

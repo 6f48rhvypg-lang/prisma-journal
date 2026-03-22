@@ -206,7 +206,7 @@
                     {% if entry.tags %}
                     <div class="card-tags flex flex-wrap gap-1 mt-2">
                         {% for tag in entry.tags[:3] %}
-                        <span class="bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 px-2 py-0.5 rounded-full text-xs">{{ tag }}</span>
+                        <span class="bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 px-2 py-0.5 rounded-full text-xs">{{ tag.split(':')[-1] }}</span>
                         {% endfor %}
                         {% if entry.tags|length > 3 %}
                         <span class="text-xs text-surface-400">+{{ entry.tags|length - 3 }}</span>

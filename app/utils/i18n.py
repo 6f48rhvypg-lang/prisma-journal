@@ -1,4 +1,26 @@
 """Minimal i18n helpers with English default and extensible language catalogs."""
+import logging
+import os
+
+_log = logging.getLogger(__name__)
+
+# Path to the editable prompts YAML file (project_root/prompts/prompts.yaml)
+_PROMPTS_FILE = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "prompts", "prompts.yaml")
+)
+
+
+def _load_yaml_prompts():
+    """Load prompts from prompts.yaml. Returns empty dict on any failure."""
+    if not os.path.exists(_PROMPTS_FILE):
+        return {}
+    try:
+        import yaml
+        with open(_PROMPTS_FILE, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f) or {}
+    except Exception as e:
+        _log.warning("Failed to load prompts.yaml: %s", e)
+        return {}
 
 TRANSLATIONS = {
     "en": {
@@ -16,137 +38,7 @@ TRANSLATIONS = {
         "daily_question.load_failed": "Question could not be loaded.",
         "daily_question.refresh_failed": "A new question could not be loaded.",
         
-        # AI Prompts
-        "prompt.analyze_entry": (
-            "You are an empathetic journaling coach. Analyze the journal entry and provide:\n"
-            "1. **Emotional Tone** - The primary emotions expressed\n"
-            "2. **Key Themes** - Main topics or concerns\n"
-            "3. **Cognitive Patterns** - Any thinking patterns (positive or limiting)\n"
-            "4. **Reframe** - A constructive reframe of any negative thoughts\n"
-            "5. **Follow-up Prompt** - One thought-provoking question to go deeper\n\n"
-            "Keep your response concise and supportive."
-        ),
-        "prompt.suggest_title": "Generate a short, evocative title (max 8 words) for this journal entry. Return only the title, no quotes or extra text.",
-        "prompt.generate_image_prompt": "Based on this journal entry, create a short Stable Diffusion image prompt (max 50 words) that captures the mood and theme as {style} art. Return only the prompt.",
-        "prompt.generate_deeper_questions": (
-            "You are a thoughtful journaling coach. Generate an insightful follow-up question that:\n"
-            "1. Helps explore emotions more deeply\n"
-            "2. Identifies underlying motivations or patterns\n"
-            "3. Considers different perspectives\n"
-            "4. Is open-ended, not yes/no\n"
-            "5. Feels supportive, not interrogative\n\n"
-            "Return ONE question only. No preface, no list."
-        ),
-        "prompt.entry_metadata": (
-            "You are an experienced analyst skilled in text analysis and summarization. "
-            "Your goal is to analyze the following journal entry and create a structured overview.\n\n"
-            "Instructions:\n"
-            "1. Analyze the journal entry thoroughly.\n"
-            "2. Return a valid JSON object with these exact keys:\n"
-            "    - \"title\": A descriptive title (8-12 words) summarizing the core content.\n"
-            "    - \"summary\": A brief summary in 2-3 sentences covering the key points.\n"
-            "    - \"themes\": An array of 2-5 central themes or keywords from the entry.\n\n"
-            "# Important\nAll text (title, summary, themes) must be in {response_language}."
-        ),
-        "prompt.suggest_tags": (
-            "You are a tagging system for journal entries. Extract EXACTLY 5 relevant tags.\n\n"
-            "Rules:\n"
-            "1. Exactly 5 tags in the JSON array\n"
-            "2. Each tag: lowercase, 2-20 characters\n"
-            "3. Use hyphens for compound concepts: \"work-stress\", \"family-dinner\"\n"
-            "4. Avoid generic tags like \"entry\", \"journal\", \"thoughts\"\n"
-            "5. Focus on concrete topics, emotions, activities, people\n\n"
-            "Return valid JSON: {{\"tags\": [\"tag1\", \"tag2\", \"tag3\", \"tag4\", \"tag5\"]}}"
-        ),
-        "prompt.active_issues": (
-            "Analyze the user's journal entries and identify 3-5 active 'issues' "
-            "(unresolved problems, ongoing concerns, topics currently on the user's mind).\n\n"
-            "CRITICAL: Reply EXCLUSIVELY in {response_language}. "
-            "Do not use other languages like English or Chinese. "
-            "All generated text must be in {response_language}."
-        ),
-        "prompt.extract_tags": (
-            "Analyze this journal entry and extract 3-7 relevant tags in {response_language}.\n\n"
-            "Guidelines:\n"
-            "- Use hyphens for compound terms: \"work-stress\", \"family-dinner\"\n"
-            "- Return valid JSON: {{\"tags\": [\"tag1\", \"tag2\", ...]}}"
-        ),
-        "prompt.detect_emotions": (
-            "You are an emotion analyst using Plutchik's wheel. Analyze this journal entry for emotions.\n"
-            "Valid emotions: {emotions_list}\n\n"
-            "Return a JSON object with:\n"
-            '- "emotions": Array of detected emotions, each with:\n'
-            '  - "emotion": one of the valid emotions\n'
-            '  - "intensity": "low", "medium", or "high"\n'
-            '  - "frequency": 0.0-1.0 (how prominent in the text)\n'
-            '  - "passage": a short quote from the text showing this emotion\n\n'
-            "Only include emotions actually present. Return ONLY valid JSON."
-        ),
-        "prompt.identify_patterns": (
-            "You are a CBT-trained cognitive analyst. Analyze this journal entry for thinking patterns.\n"
-            "{themes_hint}"
-            "Return a JSON object with:\n"
-            '- "cognitive_distortions": Array of any cognitive distortions found, each with:\n'
-            '  - "type": name of distortion (e.g., "all-or-nothing thinking", "catastrophizing", "mind reading")\n'
-            '  - "example": quote from text showing this pattern\n'
-            '  - "reframe": a healthier alternative perspective\n'
-            '- "recurring_themes": Array of themes that might recur in their journaling\n'
-            '- "sentiment_trend": "positive", "negative", "mixed", or "neutral"\n'
-            '- "growth_areas": Array of 1-3 areas for personal growth or reflection\n\n'
-            "Be supportive, not critical. Return ONLY valid JSON. Use {response_language} for all user-facing text."
-        ),
-        "prompt.generate_artwork_prompt": (
-            "Create a Stable Diffusion prompt (max 50 words) for abstract {style} art.\n"
-            "The artwork should capture the mood and themes below WITHOUT including any specific personal details.\n"
-            "Focus on colors, shapes, textures, and abstract representations.\n"
-            "Return ONLY the prompt text, nothing else."
-        ),
-        "prompt.generate_personalized_prompts": (
-            "You are a thoughtful journaling coach. Based on this user's journal history, "
-            "generate 3 personalized writing prompts that:\n"
-            "1. One prompt to explore an UNDER-EXPLORED topic they haven't written much about\n"
-            "2. One prompt to REVISIT a theme from their past with fresh perspective\n"
-            "3. One prompt for GROWTH based on patterns you notice\n\n"
-            "Return ONLY a JSON array of 3 objects, each with:\n"
-            '- "category": "explore", "revisit", or "growth"\n'
-            '- "text": the prompt text (open-ended question)\n'
-            '- "reason": brief explanation why this prompt is suggested (1 sentence)\n\n'
-            "Return ONLY valid JSON, no other text. Use {response_language} for all text."
-        ),
-        "prompt.generate_big_five_analysis": (
-            "You are a personality analyst. Based on the journal excerpts, provide Big Five insights.\n"
-            "Return ONLY a JSON object with keys: openness, conscientiousness, extraversion, agreeableness, neuroticism.\n"
-            "Each key should map to an object with:\n"
-            '- "summary": 2-3 sentences of insight\n'
-            '- "evidence": array of 2-3 short evidence phrases from the excerpts\n\n'
-            "Timeframe: {timeframe_label}. Avoid clinical language. Use {response_language} for all text."
-        ),
-        "prompt.generate_recurring_topics": (
-            "You are a journaling insights assistant. Summarize each topic into a short insight.\n"
-            "Return ONLY a JSON array of objects with keys:\n"
-            '- "title": short topic title\n'
-            '- "insight": 2-3 sentence insight\n\n'
-            "Keep the tone supportive and concise. Use {response_language} for all text."
-        ),
-        "prompt.daily_reflection_question": (
-            "You are a thoughtful journaling coach. Based on the user's recent journal entries, "
-            "generate ONE personalized daily reflection question.\n\n"
-            "The question should:\n"
-            "1. Connect to themes or emotions from their recent writing\n"
-            "2. Be open-ended and thought-provoking\n"
-            "3. Encourage deeper self-reflection\n"
-            "4. Feel fresh and not repetitive\n\n"
-            "Return ONLY the question text, nothing else. Use {response_language}."
-        ),
-        "prompt.chat_persona_entry": (
-            "You are a compassionate therapist helping the user reflect on a single journal entry. "
-            "Use {response_language} for all responses."
-        ),
-        "prompt.chat_persona_global": (
-            "You are a data analyst summarizing patterns across multiple journal entries. "
-            "Use {response_language} for all responses."
-        ),
-        
+
         # UI Translations
         "ui.dashboard.hero": "What's on your mind today?",
         "ui.dashboard.new_entry": "New Entry",
@@ -401,7 +293,6 @@ TRANSLATIONS = {
         "ui.settings.custom_frameworks": "Custom Frameworks",
         "ui.settings.framework_total": "{count} total",
         "ui.settings.save_framework": "Save Framework",
-        "ui.settings.ai_system_prompts": "AI System Prompts",
         "ui.settings.checking": "Checking...",
         "ui.settings.refresh_failed": "Failed to refresh service status.",
         "ui.settings.generating": "Generating...",
@@ -420,12 +311,6 @@ TRANSLATIONS = {
         "ui.settings.saving": "Saving...",
         "ui.settings.save_short": "Save",
         "ui.settings.save_failed": "Save failed.",
-        "ui.settings.prompt_saved": "Prompt saved.",
-        "ui.settings.network_save_error": "Network error saving prompt.",
-        "ui.settings.reset_prompt_confirm": "Reset this prompt to its default? Your customizations will be lost.",
-        "ui.settings.reset_failed": "Reset failed.",
-        "ui.settings.prompt_reset": "Prompt reset to default.",
-        "ui.settings.network_reset_error": "Network error resetting prompt.",
         "ui.settings.ollama_model": "Ollama model",
         "ui.settings.ollama_pull_hint": "Pull models with",
         "ui.settings.emotion_analysis": "Emotion analysis",
@@ -483,30 +368,6 @@ TRANSLATIONS = {
         "ui.settings.framework_category_placeholder": "relationships",
         "ui.settings.framework_description_placeholder": "A gentle reset for hard conversations.",
         "ui.settings.framework_questions_placeholder": "What happened?\nWhat do I feel?\nWhat do I need?",
-        "ui.settings.prompts_expand_hint": "Click a category to expand and edit prompts. Changes are saved individually.",
-        "ui.settings.quick_reference": "Quick Reference:",
-        "ui.settings.ai_prompts_description": "Customize AI instructions organized by where they are used in the app.",
-        "ui.settings.legend_entry": "📓 Entry: Analysis, emotions, artwork",
-        "ui.settings.legend_dashboard": "🏠 Dashboard: Daily questions & suggestions",
-        "ui.settings.legend_insights": "📊 Insights: Pattern analysis",
-        "ui.settings.legend_chat": "💬 Chat: AI personas",
-        "ui.settings.save_prompt": "Save",
-        "ui.settings.reset_to_default": "Reset to Default",
-        "ui.settings.prompts_count_one": "{count} prompt",
-        "ui.settings.prompts_count_other": "{count} prompts",
-        "ui.settings.unsaved": "Unsaved",
-        "ui.settings.category.entry": "📓 Journal Entry (Entry Creation & Analysis)",
-        "ui.settings.category_desc.entry": "Prompts used when creating entries, analyzing content, detecting emotions, and generating artwork. These affect the 'Finish Entry' flow and entry view page.",
-        "ui.settings.category.dashboard": "🏠 Dashboard (Daily Engagement)",
-        "ui.settings.category_desc.dashboard": "Prompts for the homepage features: daily reflection questions and personalized writing suggestions based on your journal history.",
-        "ui.settings.category.insights": "📊 Insights (Pattern Analysis)",
-        "ui.settings.category_desc.insights": "Prompts for the analytics page: Big Five personality analysis and recurring topic insights across multiple entries.",
-        "ui.settings.category.chat": "💬 AI Chat (Conversational Assistant)",
-        "ui.settings.category_desc.chat": "System prompts that define the AI's persona when chatting about entries (therapist mode) or analyzing patterns across entries (analyst mode).",
-        "ui.settings.category.image": "🎨 Image Generation (Artwork)",
-        "ui.settings.category_desc.image": "Prompts for generating images directly from entry content via the image generation API.",
-        "ui.settings.category.legacy": "🔧 Unused / Legacy",
-        "ui.settings.category_desc.legacy": "These prompts are not currently used in the application but are kept for compatibility or future features.",
         "ui.filter.date_from": "From",
         "ui.filter.date_to": "To",
         "ui.filter.emotions": "Emotions",
@@ -813,135 +674,7 @@ TRANSLATIONS = {
         "daily_question.load_failed": "Frage konnte nicht geladen werden.",
         "daily_question.refresh_failed": "Eine neue Frage konnte nicht geladen werden.",
         
-        # AI Prompts
-        "prompt.analyze_entry": (
-            "Du bist ein einfühlsamer Journaling-Coach. Analysiere den Tagebucheintrag und liefere:\n"
-            "1. **Emotionaler Ton** - Die primären ausgedrückten Emotionen\n"
-            "2. **Kernthemen** - Hauptthemen oder Anliegen\n"
-            "3. **Kognitive Muster** - Alle Denkmuster (positiv oder limitierend)\n"
-            "4. **Reframing** - Ein konstruktives Reframing negativer Gedanken\n"
-            "5. **Folgefrage** - Eine zum Nachdenken anregende Frage, um tiefer zu gehen\n\n"
-            "Halte deine Antwort prägnant und unterstützend."
-        ),
-        "prompt.suggest_title": "Generiere einen kurzen, aussagekräftigen Titel (max. 8 Wörter) für diesen Tagebucheintrag. Gib nur den Titel zurück, keine Anführungszeichen oder zusätzlichen Text.",
-        "prompt.generate_image_prompt": "Basierend auf diesem Tagebucheintrag, erstelle einen kurzen Stable Diffusion Bild-Prompt (max. 50 Wörter), der die Stimmung und das Thema als {style} Kunst einfängt. Gib nur den Prompt zurück.",
-        "prompt.generate_deeper_questions": (
-            "Du bist ein nachdenklicher Journaling-Coach. Generiere eine einsichtsvolle Folgefrage, die:\n"
-            "1. Hilft, Emotionen tiefer zu erforschen\n"
-            "2. Zugrunde liegende Motivationen oder Muster identifiziert\n"
-            "3. Verschiedene Perspektiven berücksichtigt\n"
-            "4. Offen ist, nicht Ja/Nein\n"
-            "5. Sich unterstützend anfühlt, nicht verhörend\n\n"
-            "Gib NUR eine Frage zurück. Keine Einleitung, keine Liste."
-        ),
-        "prompt.entry_metadata": (
-            "Du bist ein erfahrener Analytiker mit einem besonderen Talent für Textanalyse und Zusammenfassung. "
-            "Dein Ziel ist es, den folgenden Tagebucheintrag zu analysieren und eine strukturierte Übersicht zu erstellen.\n\n"
-            "Anweisungen:\n"
-            "1. Analysiere den Tagebucheintrag gründlich.\n"
-            "2. Gib ein valides JSON-Objekt mit diesen exakten Schlüsseln zurück:\n"
-            "    - \"title\": Ein beschreibender Titel (8-12 Wörter), der den Kerninhalt zusammenfasst.\n"
-            "    - \"summary\": Eine kurze Zusammenfassung in 2-3 Sätzen, die die wichtigsten Punkte wiedergibt.\n"
-            "    - \"themes\": Ein Array mit 2-5 zentralen Themen oder Stichwörtern, die im Eintrag behandelt werden.\n\n"
-            "# Wichtig\nAlle Texte (Titel, Zusammenfassung, Themen) müssen auf Deutsch verfasst sein."
-        ),
-        "prompt.suggest_tags": (
-            "Du bist ein Tagging-System für deutsche Tagebucheinträge. Extrahiere EXAKT 5 relevante Tags.\n\n"
-            "Regeln:\n"
-            "1. Genau 5 Tags im JSON-Array\n"
-            "2. Jeder Tag: Kleinschreibung, 2-20 Zeichen\n"
-            "3. Bindestriche für zusammengesetzte Begriffe: \"arbeit-stress\", \"familienessen\"\n"
-            "4. Vermeide generische Tags wie \"eintrag\", \"tagebuch\", \"gedanken\"\n"
-            "5. Fokus auf konkrete Themen, Emotionen, Aktivitäten, Personen\n\n"
-            "Gib valides JSON zurück: {{\"tags\": [\"tag1\", \"tag2\", \"tag3\", \"tag4\", \"tag5\"]}}"
-        ),
-        "prompt.active_issues": (
-            "Analysiere die Tagebucheinträge des Nutzers und identifiziere 3-5 aktive 'Baustellen' "
-            "(ungelöste Probleme, laufende Anliegen, Themen, die den Nutzer aktuell beschäftigen).\n\n"
-            "WICHTIG: Antworte AUSSCHLIEßLICH auf Deutsch. "
-            "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-            "Alle Texte müssen auf Deutsch verfasst sein."
-        ),
-        "prompt.extract_tags": (
-            "Analysiere diesen Tagebucheintrag und extrahiere 3-7 relevante Tags auf Deutsch.\n\n"
-            "Richtlinien:\n"
-            "- Verwende Bindestriche für zusammengesetzte Begriffe: \"arbeit-stress\", \"familienessen\"\n"
-            "- Gib valides JSON zurück: {{\"tags\": [\"tag1\", \"tag2\", ...]}}"
-        ),
-        "prompt.detect_emotions": (
-            "Du bist ein Emotions-Analytiker, der Plutchiks Rad der Emotionen verwendet. Analysiere diesen Tagebucheintrag nach Emotionen.\n"
-            "Gültige Emotionen: {emotions_list}\n\n"
-            "Gib ein JSON-Objekt zurück mit:\n"
-            '- "emotions": Array der erkannten Emotionen, jeweils mit:\n'
-            '  - "emotion": eine der gültigen Emotionen\n'
-            '  - "intensity": "low", "medium" oder "high"\n'
-            '  - "frequency": 0.0-1.0 (wie prominent im Text)\n'
-            '  - "passage": ein kurzes Zitat aus dem Text, das diese Emotion zeigt\n\n'
-            "Nur tatsächlich vorhandene Emotionen einbeziehen. Gib NUR valides JSON zurück."
-        ),
-        "prompt.identify_patterns": (
-            "Du bist ein CBT-geschulter kognitiver Analytiker. Analysiere diesen Tagebucheintrag nach Denkmustern.\n"
-            "{themes_hint}"
-            "Gib ein JSON-Objekt zurück mit:\n"
-            '- "cognitive_distortions": Array aller gefundenen kognitiven Verzerrungen, jeweils mit:\n'
-            '  - "type": Name der Verzerrung (z.B. "Schwarz-Weiß-Denken", "Katastrophisieren", "Gedankenlesen")\n'
-            '  - "example": Zitat aus dem Text, das dieses Muster zeigt\n'
-            '  - "reframe": eine gesündere alternative Perspektive\n'
-            '- "recurring_themes": Array von Themen, die in ihrem Journaling wiederkehren könnten\n'
-            '- "sentiment_trend": "positive", "negative", "mixed" oder "neutral"\n'
-            '- "growth_areas": Array von 1-3 Bereichen für persönliches Wachstum oder Reflexion\n\n'
-            "Sei unterstützend, nicht kritisch. Gib NUR valides JSON zurück."
-        ),
-        "prompt.generate_artwork_prompt": (
-            "Erstelle einen Stable Diffusion Prompt (max. 50 Wörter) für abstrakte {style} Kunst.\n"
-            "Das Kunstwerk sollte die Stimmung und Themen einfangen, OHNE spezifische persönliche Details zu enthalten.\n"
-            "Fokussiere dich auf Farben, Formen, Texturen und abstrakte Darstellungen.\n"
-            "Gib NUR den Prompt-Text zurück, nichts anderes."
-        ),
-        "prompt.generate_personalized_prompts": (
-            "Du bist ein nachdenklicher Journaling-Coach. Basierend auf der Journal-Historie dieses Nutzers, "
-            "generiere 3 personalisierte Schreib-Prompts:\n"
-            "1. Ein Prompt, um ein UNTERFORSCHTES Thema zu erkunden, über das sie noch nicht viel geschrieben haben\n"
-            "2. Ein Prompt, um ein Thema aus ihrer Vergangenheit mit frischer Perspektive zu ÜBERDENKEN\n"
-            "3. Ein Prompt für WACHSTUM basierend auf Mustern, die du bemerkst\n\n"
-            "Gib NUR ein JSON-Array mit 3 Objekten zurück, jeweils mit:\n"
-            '- "category": "explore", "revisit" oder "growth"\n'
-            '- "text": der Prompt-Text (offene Frage)\n'
-            '- "reason": kurze Erklärung, warum dieser Prompt vorgeschlagen wird (1 Satz)\n\n'
-            "Gib NUR valides JSON zurück, keinen anderen Text."
-        ),
-        "prompt.generate_big_five_analysis": (
-            "Du bist ein Persönlichkeitsanalytiker. Basierend auf den Journal-Auszügen, liefere Big Five Einblicke.\n"
-            "Gib NUR ein JSON-Objekt mit den Schlüsseln zurück: openness, conscientiousness, extraversion, agreeableness, neuroticism.\n"
-            "Jeder Schlüssel sollte auf ein Objekt abgebildet werden mit:\n"
-            '- "summary": 2-3 Sätze Einblick\n'
-            '- "evidence": Array von 2-3 kurzen Beweis-Phrasen aus den Auszügen\n\n'
-            "Zeitrahmen: {timeframe_label}. Vermeide klinische Sprache."
-        ),
-        "prompt.generate_recurring_topics": (
-            "Du bist ein Journaling-Einblicke-Assistent. Fasse jedes Thema in einen kurzen Einblick zusammen.\n"
-            "Gib NUR ein JSON-Array von Objekten mit den Schlüsseln zurück:\n"
-            '- "title": kurzer Themen-Titel\n'
-            '- "insight": 2-3 Sätze Einblick\n\n'
-            "Halte den Ton unterstützend und prägnant."
-        ),
-        "prompt.daily_reflection_question": (
-            "Du bist ein nachdenklicher Journaling-Coach. Basierend auf den neuesten Tagebucheinträgen des Nutzers, "
-            "generiere EINE personalisierte tägliche Reflexionsfrage.\n\n"
-            "Die Frage sollte:\n"
-            "1. Mit Themen oder Emotionen aus ihrem neuesten Schreiben verbunden sein\n"
-            "2. Offen und zum Nachdenken anregend sein\n"
-            "3. Tiefere Selbstreflexion fördern\n"
-            "4. Frisch und nicht repetitiv wirken\n\n"
-            "Gib NUR den Fragetext zurück, nichts anderes."
-        ),
-        "prompt.chat_persona_entry": (
-            "Du bist ein mitfühlender Therapeut, der dem Nutzer hilft, über einen einzelnen Tagebucheintrag nachzudenken."
-        ),
-        "prompt.chat_persona_global": (
-            "Du bist ein Datenanalytiker, der Muster über mehrere Tagebucheinträge hinweg zusammenfasst."
-        ),
-        
+
         # UI Translations
         "ui.dashboard.hero": "Was bewegt dich heute?",
         "ui.dashboard.new_entry": "Neuer Eintrag",
@@ -1196,7 +929,6 @@ TRANSLATIONS = {
         "ui.settings.custom_frameworks": "Benutzerdefinierte Frameworks",
         "ui.settings.framework_total": "{count} gesamt",
         "ui.settings.save_framework": "Framework speichern",
-        "ui.settings.ai_system_prompts": "KI-Systemprompts",
         "ui.settings.checking": "Prüfe...",
         "ui.settings.refresh_failed": "Dienststatus konnte nicht aktualisiert werden.",
         "ui.settings.generating": "Generiere...",
@@ -1215,12 +947,6 @@ TRANSLATIONS = {
         "ui.settings.saving": "Speichere...",
         "ui.settings.save_short": "Speichern",
         "ui.settings.save_failed": "Speichern fehlgeschlagen.",
-        "ui.settings.prompt_saved": "Prompt gespeichert.",
-        "ui.settings.network_save_error": "Netzwerkfehler beim Speichern des Prompts.",
-        "ui.settings.reset_prompt_confirm": "Diesen Prompt auf Standard zurücksetzen? Deine Anpassungen gehen verloren.",
-        "ui.settings.reset_failed": "Zurücksetzen fehlgeschlagen.",
-        "ui.settings.prompt_reset": "Prompt auf Standard zurückgesetzt.",
-        "ui.settings.network_reset_error": "Netzwerkfehler beim Zurücksetzen des Prompts.",
         "ui.settings.ollama_model": "Ollama-Modell",
         "ui.settings.ollama_pull_hint": "Modelle laden mit",
         "ui.settings.emotion_analysis": "Emotionsanalyse",
@@ -1278,30 +1004,6 @@ TRANSLATIONS = {
         "ui.settings.framework_category_placeholder": "Beziehungen",
         "ui.settings.framework_description_placeholder": "Ein sanfter Reset für schwierige Gespräche.",
         "ui.settings.framework_questions_placeholder": "Was ist passiert?\nWas fühle ich?\nWas brauche ich?",
-        "ui.settings.prompts_expand_hint": "Klicke eine Kategorie, um Prompts aufzuklappen und zu bearbeiten. Änderungen werden einzeln gespeichert.",
-        "ui.settings.quick_reference": "Schnellreferenz:",
-        "ui.settings.ai_prompts_description": "Passe KI-Anweisungen an, organisiert nach ihrer Verwendung in der App.",
-        "ui.settings.legend_entry": "📓 Eintrag: Analyse, Emotionen, Artwork",
-        "ui.settings.legend_dashboard": "🏠 Dashboard: Tägliche Fragen & Vorschläge",
-        "ui.settings.legend_insights": "📊 Einblicke: Musteranalyse",
-        "ui.settings.legend_chat": "💬 Chat: KI-Personas",
-        "ui.settings.save_prompt": "Speichern",
-        "ui.settings.reset_to_default": "Auf Standard zurücksetzen",
-        "ui.settings.prompts_count_one": "{count} Prompt",
-        "ui.settings.prompts_count_other": "{count} Prompts",
-        "ui.settings.unsaved": "Ungespeichert",
-        "ui.settings.category.entry": "📓 Tagebucheintrag (Erstellung & Analyse)",
-        "ui.settings.category_desc.entry": "Prompts zur Eintragsberarbeitung, Inhaltsanalyse, Emotionserkennung und Artwork-Generierung. Diese beeinflussen den 'Eintrag abschließen'-Flow und die Eintragsansicht.",
-        "ui.settings.category.dashboard": "🏠 Dashboard (Tägliche Aktivitäten)",
-        "ui.settings.category_desc.dashboard": "Prompts für die Startseiten-Features: tägliche Reflexionsfragen und personalisierte Schreibvorschläge basierend auf deinem Tagebuch.",
-        "ui.settings.category.insights": "📊 Einblicke (Musteranalyse)",
-        "ui.settings.category_desc.insights": "Prompts für die Analytics-Seite: Big-Five-Persönlichkeitsanalyse und wiederkehrende Themen-Insights über mehrere Einträge hinweg.",
-        "ui.settings.category.chat": "💬 KI-Chat (Konversationeller Assistent)",
-        "ui.settings.category_desc.chat": "System-Prompts, die die KI-Persona beim Chatten über Einträge (Therapeuten-Modus) oder beim Analysieren von Mustern (Analyst-Modus) definieren.",
-        "ui.settings.category.image": "🎨 Bildgenerierung (Artwork)",
-        "ui.settings.category_desc.image": "Prompts zur direkten Bildgenerierung aus Einträgen via Bildgenerungs-API.",
-        "ui.settings.category.legacy": "🔧 Ungenutzt / Veraltet",
-        "ui.settings.category_desc.legacy": "Diese Prompts werden derzeit in der Anwendung nicht verwendet, aber zur Kompatibilität oder zukünftigen Features beibehalten.",
         "ui.filter.date_from": "Von",
         "ui.filter.date_to": "Bis",
         "ui.filter.emotions": "Emotionen",
@@ -1639,5 +1341,15 @@ def get_prompt(prompt_key, lang="de", **kwargs):
     
     # Merge response_language into kwargs
     format_params = {"response_language": response_language, **kwargs}
-    
+
+    # Check prompts.yaml first (live-editable, takes priority over hardcoded values)
+    yaml_key = prompt_key.removeprefix("prompt.")
+    yaml_prompts = _load_yaml_prompts()
+    if yaml_key in yaml_prompts:
+        text = str(yaml_prompts[yaml_key])
+        try:
+            return text.format(**format_params)
+        except Exception:
+            return text
+
     return translate(prompt_key, lang, **format_params)

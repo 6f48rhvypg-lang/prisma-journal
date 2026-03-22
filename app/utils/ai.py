@@ -918,12 +918,13 @@ def generate_daily_question(recent_summaries):
 # Tag Suggestion Functions
 # ---------------------------------------------------------------------------
 
-def suggest_tags(content, max_tags=7):
+def suggest_tags(content, max_tags=20, user_existing_tags=None):
     """Extract relevant tags from journal entry content using small model.
 
     Args:
         content: The journal entry text
-        max_tags: Maximum number of tags to return (default 7)
+        max_tags: Maximum number of tags to return (default 15)
+        user_existing_tags: Optional list of tag names the user has used before
 
     Returns:
         dict with keys:
@@ -950,14 +951,20 @@ def suggest_tags(content, max_tags=7):
     # Use dedicated tag model (usually smaller/faster)
     tag_model = Config.TAG_MODEL
 
+    # Format existing user tags for the prompt so AI can prefer them
+    if user_existing_tags:
+        existing_tags_str = ", ".join(sorted(user_existing_tags)[:40])
+    else:
+        existing_tags_str = "keine bisherigen Tags vorhanden"
+
     # Get the prompt from database (editable in settings) or fallback to default
-    system_prompt = _get_prompt("tag_extraction")
-    
+    system_prompt = _get_prompt("tag_extraction", existing_tags=existing_tags_str)
+
     response = chat_with_ollama(
         truncated,
-        system_prompt=system_prompt.format(content=truncated),
+        system_prompt=system_prompt,
         model=tag_model,
-        timeout=15  # Short timeout for fast response
+        timeout=20  # Slightly longer for more comprehensive extraction
     )
 
     print(f"[suggest_tags] Raw Ollama response (first 500 chars): {response[:500]}")

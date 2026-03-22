@@ -79,9 +79,6 @@ from database.db import (
     DatabaseError,
     check_database_integrity,
     get_database_stats,
-    get_system_prompt,
-    update_system_prompt,
-    get_all_system_prompts,
     get_daily_question,
     create_daily_question,
     mark_daily_question_answered,
@@ -704,7 +701,7 @@ def new_entry():
 
         # Generate title using AI if Ollama is available
         entry_title = None
-        if status.ollama:
+        if status.llm_ok:
             try:
                 entry_title = suggest_title(content)
             except Exception as e:
@@ -1007,65 +1004,6 @@ def settings():
     ollama_models = _get_ollama_models() if status.ollama else []
     frameworks = _translate_frameworks(get_all_frameworks())
 
-    # System prompts for the prompt editor section
-    system_prompts = get_all_system_prompts()
-
-    # Extract {placeholder} variables from each prompt for display
-    prompt_placeholders = {}
-    for sp in system_prompts:
-        matches = re.findall(r'\{(\w+)\}', sp.get("prompt_text", ""))
-        prompt_placeholders[sp["key"]] = list(dict.fromkeys(matches))  # unique, order-preserved
-
-    # Get current language for i18n
-    lang = _current_language()
-    
-    # Group prompts by WHERE they are processed in the application
-    # This helps users understand which prompts affect which features
-    # Keys map to i18n keys
-    prompt_categories_keys = {
-        "entry": [
-            "analyze_entry",
-            "generate_summary_and_title",
-            "detect_emotions",
-            "identify_patterns",
-            "generate_artwork_prompt",
-            "generate_deeper_questions",
-            "generate_deeper_questions_followup",
-            "tag_extraction",
-            "suggest_title",
-        ],
-        "dashboard": [
-            "daily_reflection_question",
-            "generate_personalized_prompts",
-            "generate_personalized_prompts_embeddings",
-        ],
-        "insights": [
-            "generate_big_five_analysis",
-            "generate_recurring_topics",
-            "identify_baustellen",
-        ],
-        "chat": [
-            "chat_persona_entry",
-            "chat_persona_global",
-        ],
-        "image": [
-            "generate_image_prompt",
-        ],
-        "legacy": [
-            "emotion_summary",
-            "image_generation",
-        ],
-    }
-    
-    # Build translated category names and descriptions
-    prompt_categories = {}
-    prompt_category_descriptions = {}
-    for key, prompt_list in prompt_categories_keys.items():
-        cat_name = i18n_translate(f"ui.settings.category.{key}", lang)
-        cat_desc = i18n_translate(f"ui.settings.category_desc.{key}", lang)
-        prompt_categories[cat_name] = prompt_list
-        prompt_category_descriptions[cat_name] = cat_desc
-
     return render_template(
         "settings.html",
         settings=settings_data,
@@ -1080,10 +1018,6 @@ def settings():
         settings_message=settings_message,
         settings_errors=settings_errors,
         restart_warnings=restart_warnings,
-        system_prompts=system_prompts,
-        prompt_categories=prompt_categories,
-        prompt_placeholders=prompt_placeholders,
-        prompt_category_descriptions=prompt_category_descriptions,
     )
 
 
@@ -1108,11 +1042,11 @@ def api_analyze():
     if not is_valid:
         return jsonify({"error": error_msg}), 400
 
-    # Check if Ollama is available
-    if not status.ollama:
+    # Check if LLM is available
+    if not status.llm_ok:
         return jsonify({
             "error": "AI analysis is currently unavailable.",
-            "details": status.ollama_message,
+            "details": status.llm_message,
             "recoverable": True,
         }), 503
 
@@ -1620,10 +1554,10 @@ def api_chat():
     if not query:
         return jsonify({"error": "query is required"}), 400
 
-    if not status.ollama:
+    if not status.llm_ok:
         return jsonify({
             "error": "AI chat is currently unavailable.",
-            "details": status.ollama_message,
+            "details": status.llm_message,
             "recoverable": True,
         }), 503
 
@@ -1866,6 +1800,17 @@ def api_delete_all_data():
     return jsonify({"deleted": True})
 
 
+@app.route("/api/settings/theme_mode", methods=["POST"])
+def api_settings_theme_mode():
+    """Update theme_mode setting (light/dark/auto) from the toggle button."""
+    data = request.get_json(silent=True) or {}
+    mode = data.get("theme_mode")
+    if mode not in ("light", "dark", "auto"):
+        return jsonify({"error": "invalid theme_mode"}), 400
+    set_setting("theme_mode", mode)
+    return jsonify({"theme_mode": mode})
+
+
 @app.route("/api/settings/export")
 def api_settings_export():
     """Export settings as JSON."""
@@ -1919,65 +1864,6 @@ def api_refresh_services():
 
 
 # ---------------------------------------------------------------------------
-# System Prompts API
-# ---------------------------------------------------------------------------
-
-
-@app.route("/api/system-prompts")
-def api_list_system_prompts():
-    """List all system prompts with metadata."""
-    prompts = get_all_system_prompts()
-    return jsonify({"prompts": prompts})
-
-
-@app.route("/api/system-prompts/<key>")
-def api_get_system_prompt(key):
-    """Get a single system prompt by key."""
-    prompt = get_system_prompt(key)
-    if prompt is None:
-        return jsonify({"error": f"Prompt '{key}' not found"}), 404
-    return jsonify({"key": key, "prompt_text": prompt})
-
-
-@app.route("/api/system-prompts/<key>", methods=["PUT", "POST"])
-def api_update_system_prompt(key):
-    """Update a system prompt's text."""
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "Invalid JSON data"}), 400
-
-    prompt_text = data.get("prompt_text")
-    if not prompt_text or not prompt_text.strip():
-        return jsonify({"error": "prompt_text is required"}), 400
-
-    success = update_system_prompt(key, prompt_text.strip())
-    if not success:
-        return jsonify({"error": f"Prompt '{key}' not found"}), 404
-
-    return jsonify({"success": True, "key": key})
-
-
-@app.route("/api/system-prompts/<key>/reset", methods=["POST"])
-def api_reset_system_prompt(key):
-    """Reset a system prompt to its default from i18n."""
-    from utils.ai import _get_prompt
-    
-    try:
-        # Get default prompt from i18n system
-        default_text = _get_prompt(key)
-        if not default_text:
-            return jsonify({"error": f"No default found for prompt '{key}'"}), 404
-
-        success = update_system_prompt(key, default_text)
-        if not success:
-            return jsonify({"error": f"Prompt '{key}' not found in database"}), 404
-
-        return jsonify({"success": True, "key": key, "prompt_text": default_text})
-    except Exception as e:
-        return jsonify({"error": f"Failed to reset prompt: {str(e)}"}), 500
-
-
-# ---------------------------------------------------------------------------
 # Tag Suggestion API
 # ---------------------------------------------------------------------------
 
@@ -2008,8 +1894,8 @@ def api_suggest_tags():
     
     content = data.get("content", "").strip()
     existing_tags_raw = data.get("existing_tags", []) or []
-    max_existing = min(int(data.get("max_existing", 5)), 8)
-    max_new = min(int(data.get("max_new", 2)), 4)
+    max_existing = min(int(data.get("max_existing", 7)), 10)
+    max_new = min(int(data.get("max_new", 6)), 10)
     
     # Normalize existing tags
     existing_tags = [t.lower().strip().replace(' ', '-') for t in existing_tags_raw if t]
@@ -2038,8 +1924,8 @@ def api_suggest_tags():
         "baustellen_matches": []
     }
     
-    # Check Ollama availability
-    if not status.ollama:
+    # Check LLM availability
+    if not status.llm_ok:
         suggestions["fallback"] = True
         suggestions["message"] = "AI unavailable - showing your popular tags"
         
@@ -2060,8 +1946,12 @@ def api_suggest_tags():
         suggestions["confidence"] = 0.5
         return jsonify(suggestions)
     
-    # Stage 1: Get AI-extracted tags (potential new tags)
-    ai_result = suggest_tags(content, max_tags=10)
+    # Stage 1a: Get existing tags from user's history (needed for AI prompt)
+    user_tags = get_user_tags_with_frequency(days=365, limit=50)
+    user_tag_names = {t["tag_name"] for t in user_tags}
+
+    # Stage 1b: Get AI-extracted tags, passing existing tags so AI can prefer them
+    ai_result = suggest_tags(content, max_tags=20, user_existing_tags=list(user_tag_names))
     print(f"[TagSuggest] AI result: {ai_result}")
 
     ai_error = ai_result.get("error")
@@ -2071,10 +1961,6 @@ def api_suggest_tags():
     ai_tags_raw = ai_result.get("suggested_tags", []) if not ai_error else []
     ai_tags = [str(tag) for tag in ai_tags_raw] if isinstance(ai_tags_raw, list) else []
     print(f"[TagSuggest] AI tags extracted: {ai_tags}")
-
-    # Stage 2: Get existing tags from user's history
-    user_tags = get_user_tags_with_frequency(days=90, limit=30)
-    user_tag_names = {t["tag_name"] for t in user_tags}
     print(f"[TagSuggest] User tags from history: {user_tag_names}")
     
     # Stage 3: Find co-occurring tags with existing entry tags
@@ -2512,7 +2398,7 @@ def api_analyze_baustellen():
             "message": _t("insights.issues.cached")
         })
     
-    if auto_create and status.ollama:
+    if auto_create and status.llm_ok:
         # Get existing Baustellen to avoid duplicates
         existing = get_all_baustellen(include_inactive=True)
         existing_headlines = {b["headline"].lower() for b in existing}
@@ -2615,8 +2501,8 @@ def _get_or_generate_daily_question():
             "message": _t("daily_question.start_journaling"),
         }
 
-    # Check if Ollama is available
-    if not status.ollama:
+    # Check if LLM is available
+    if not status.llm_ok:
         return {
             "question": _t("daily_question.default"),
             "is_new": False,
@@ -2824,10 +2710,10 @@ def api_new_daily_question():
     if _local_only_block(Config.OLLAMA_BASE_URL):
         return jsonify({"error": "Local-only mode blocks external Ollama endpoint."}), 403
 
-    if not status.ollama:
+    if not status.llm_ok:
         return jsonify({
             "error": _t("ai.unavailable"),
-            "details": status.ollama_message,
+            "details": status.llm_message,
             "recoverable": True,
         }), 503
 
@@ -3125,8 +3011,8 @@ def api_test_services():
     """Test all services with actual operations."""
     results = {}
 
-    # Test Ollama
-    if status.ollama:
+    # Test LLM
+    if status.llm_ok:
         try:
             from utils.ai import chat_with_ollama
             response = chat_with_ollama("Say 'test successful' in exactly two words.")

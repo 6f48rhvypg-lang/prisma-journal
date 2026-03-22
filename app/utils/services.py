@@ -57,6 +57,20 @@ class ServiceStatus:
         self.sd_message: str = ""
         self.sd_message_i18n: dict = {}
 
+    @property
+    def llm_ok(self) -> bool:
+        """True if the active LLM provider is available."""
+        if Config.LLM_PROVIDER == "lmstudio":
+            return self.lmstudio
+        return self.ollama
+
+    @property
+    def llm_message(self) -> str:
+        """Status message for the active LLM provider."""
+        if Config.LLM_PROVIDER == "lmstudio":
+            return self.lmstudio_message
+        return self.ollama_message
+
     def summary(self, lang: str = "de") -> list[dict]:
         """Return a list of dicts suitable for display.
         
@@ -276,6 +290,15 @@ def init_services() -> ServiceStatus:
     _, msg_de = check_stable_diffusion("de")
     status.sd_message = msg_en
     status.sd_message_i18n = {"en": msg_en, "de": msg_de}
+
+    # Auto-detect provider if not explicitly set
+    if Config.LLM_PROVIDER == "auto":
+        if status.lmstudio:
+            Config.LLM_PROVIDER = "lmstudio"
+            log.info("Auto-detected LLM provider: LM Studio")
+        else:
+            Config.LLM_PROVIDER = "ollama"
+            log.info("Auto-detected LLM provider: Ollama")
 
     # Log a startup summary
     log.info("--- Service status ---")
