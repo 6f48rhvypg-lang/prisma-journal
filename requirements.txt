@@ -3,7 +3,7 @@ flask-cors==5.0.1
 flask-compress>=1.14
 python-dotenv==1.1.0
 chromadb==0.6.3
-openai-whisper==20240930
+openai-whisper==20240930; python_version < "3.13"
 sentence-transformers==3.4.1
 requests==2.32.3
 gunicorn==23.0.0

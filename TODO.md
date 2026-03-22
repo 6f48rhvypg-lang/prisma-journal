@@ -55,6 +55,7 @@
 ### Setup/Installing
 - [] **Requirements.txt: Error installing "openai-whisper" package**
   - Error during package installation
+  - Only for Python 3.13 and above
   - **Workaround documented:** `python -m pip install --no-build-isolation openai-whisper`
   - Consider: Adding to setup docs or fixing in requirements.txt
 
@@ -83,7 +84,7 @@
   - Dual provider support (Ollama + LM Studio)
   - Provider selection in settings UI
 
-- **CLI Arguments** 
+- **CLI Arguments**
   - Added `--ollama`, `--lmstudio` and `--lang` flags
   - Custom `--port` and `--host` options
   - Command-line provider override
@@ -113,4 +114,4 @@
 - LLM provider priority: CLI args > env vars > defaults
 
 
-*Last Updated: 08.03.2026*
+*Last Updated: 17.03.2026*
