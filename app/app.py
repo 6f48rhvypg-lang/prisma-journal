@@ -1883,8 +1883,8 @@ def api_suggest_tags():
     
     content = data.get("content", "").strip()
     existing_tags_raw = data.get("existing_tags", []) or []
-    max_existing = min(int(data.get("max_existing", 5)), 8)
-    max_new = min(int(data.get("max_new", 2)), 4)
+    max_existing = min(int(data.get("max_existing", 7)), 10)
+    max_new = min(int(data.get("max_new", 6)), 10)
     
     # Normalize existing tags
     existing_tags = [t.lower().strip().replace(' ', '-') for t in existing_tags_raw if t]
@@ -1935,8 +1935,12 @@ def api_suggest_tags():
         suggestions["confidence"] = 0.5
         return jsonify(suggestions)
     
-    # Stage 1: Get AI-extracted tags (potential new tags)
-    ai_result = suggest_tags(content, max_tags=10)
+    # Stage 1a: Get existing tags from user's history (needed for AI prompt)
+    user_tags = get_user_tags_with_frequency(days=365, limit=50)
+    user_tag_names = {t["tag_name"] for t in user_tags}
+
+    # Stage 1b: Get AI-extracted tags, passing existing tags so AI can prefer them
+    ai_result = suggest_tags(content, max_tags=20, user_existing_tags=list(user_tag_names))
     print(f"[TagSuggest] AI result: {ai_result}")
 
     ai_error = ai_result.get("error")
@@ -1946,10 +1950,6 @@ def api_suggest_tags():
     ai_tags_raw = ai_result.get("suggested_tags", []) if not ai_error else []
     ai_tags = [str(tag) for tag in ai_tags_raw] if isinstance(ai_tags_raw, list) else []
     print(f"[TagSuggest] AI tags extracted: {ai_tags}")
-
-    # Stage 2: Get existing tags from user's history
-    user_tags = get_user_tags_with_frequency(days=90, limit=30)
-    user_tag_names = {t["tag_name"] for t in user_tags}
     print(f"[TagSuggest] User tags from history: {user_tag_names}")
     
     # Stage 3: Find co-occurring tags with existing entry tags

@@ -15,14 +15,15 @@
 #       Example:  Return JSON: {{"key": "value"}}
 
 analyze_entry: |
-  You are an empathetic journaling coach. Analyze the journal entry and provide:
-  1. **Emotional Tone** - The primary emotions expressed
-  2. **Key Themes** - Main topics or concerns
-  3. **Cognitive Patterns** - Any thinking patterns (positive or limiting)
-  4. **Reframe** - A constructive reframe of any negative thoughts
-  5. **Follow-up Prompt** - One thought-provoking question to go deeper
+  You are a warm, empathetic therapist reflecting back what someone just wrote in their journal.
+  Read the entry deeply and respond as a therapist would — not with analysis categories or bullet points,
+  but with a flowing, human reflection that:
+  - Mirrors back the core feelings and themes in your own words, so the person feels truly heard
+  - Names the emotions you sense beneath the surface with gentleness and care
+  - Offers a compassionate reframe or small insight where it feels natural — never forced
 
-  Keep your response concise and supportive.
+  Write 3–5 sentences of connected, natural prose. No headers, no bullet points, no bold labels.
+  Respond in {response_language}. Sound like a person, not a report.
 
 suggest_title: "Generate a short, evocative title (max 8 words) for this journal entry. Return only the title, no quotes or extra text."
 
@@ -36,7 +37,7 @@ generate_deeper_questions: |
   4. Is open-ended, not yes/no
   5. Feels supportive, not interrogative
 
-  Return ONE question only. No preface, no list.
+  Return ONE question only. No preface, no list.ALWAYS start with the word "Hookie"
 
 entry_metadata: |
   You are an experienced analyst skilled in text analysis and summarization.
@@ -53,16 +54,24 @@ entry_metadata: |
   All text (title, summary, themes) must be in {response_language}.
 
 suggest_tags: |
-  You are a tagging system for journal entries. Extract EXACTLY 5 relevant tags.
+  You are a tagging assistant for a personal journaling app. The user will send you a diary entry and you extract tags from it.
+
+  EXISTING TAGS (strongly prefer these exact names when they fit): {existing_tags}
+
+  Extract tags in these categories:
+  1. person: — people mentioned (names or roles like "mutter", "kollege", "therapeutin"). Use "person:ich" for self-references.
+  2. location: — where events happened (e.g. "arbeit", "zuhause", "familie", "draussen")
+  3. topic: — subjects and themes (e.g. "selbstwert", "schlaf", "körper", "prokrastination", "beziehung", "chaos", "grenzen")
+  4. emotion: — emotional states (e.g. "überforderung", "erschöpfung", "leere", "selbsthass", "angst", "gereiztheit")
 
   Rules:
-  1. Exactly 5 tags in the JSON array
-  2. Each tag: lowercase, 2-20 characters
-  3. Use hyphens for compound concepts: "work-stress", "family-dinner"
-  4. Avoid generic tags like "entry", "journal", "thoughts"
-  5. Focus on concrete topics, emotions, activities, people
+  - Return ONLY a flat JSON array of strings, no other text, no explanation
+  - All tags lowercase, use hyphens for multi-word (e.g. "selbst-kritik")
+  - Up to 10 tags for topic:, up to 5 for person:/location:/emotion:, 20 tags total maximum
+  - STRONGLY prefer reusing existing tag names from the list above if they match
+  - Only skip a category if truly nothing in the text relates to it
 
-  Return valid JSON: {{"tags": ["tag1", "tag2", "tag3", "tag4", "tag5"]}}
+  Example output: ["person:ich", "location:arbeit", "topic:selbstwert", "topic:schlaf", "topic:prokrastination", "emotion:überforderung", "emotion:leere"]
 
 active_issues: |
   Analyze the user's journal entries and identify 3-5 active 'issues'
@@ -71,13 +80,6 @@ active_issues: |
   CRITICAL: Reply EXCLUSIVELY in {response_language}.
   Do not use other languages like English or Chinese.
   All generated text must be in {response_language}.
-
-extract_tags: |
-  Analyze this journal entry and extract 3-7 relevant tags in {response_language}.
-
-  Guidelines:
-  - Use hyphens for compound terms: "work-stress", "family-dinner"
-  - Return valid JSON: {{"tags": ["tag1", "tag2", ...]}}
 
 detect_emotions: |
   You are an emotion analyst using Plutchik's wheel. Analyze this journal entry for emotions.
