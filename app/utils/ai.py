@@ -46,6 +46,7 @@ def _get_prompt(key, **kwargs):
         "chat_persona_global": "prompt.chat_persona_global",
         "tag_extraction": "prompt.suggest_tags",
         "identify_baustellen": "prompt.active_issues",
+        "suggest_baustellen_from_entry": "prompt.suggest_baustellen_from_entry",
     }
     
     i18n_key = key_mapping.get(key, f"prompt.{key}")
@@ -879,6 +880,88 @@ def generate_baustellen_analysis(entry_data):
         })
     
     return {"baustellen": baustellen}
+
+
+def suggest_baustellen_for_entry(new_entry_content, recent_entries, active_baustellen, dismissed_slugs):
+    """Analyze a new entry against recent entries to suggest Baustellen patterns.
+
+    Args:
+        new_entry_content: string content of the new entry
+        recent_entries: list of dicts {id, date, content, tags, summary}
+        active_baustellen: list of dicts {id, headline, core_problem}
+        dismissed_slugs: list of pattern slugs the user has previously dismissed
+
+    Returns:
+        dict with key: suggestions (list) or error (string)
+        Each suggestion: {label, core_problem, confidence, existing_baustelle_id, pattern_slug}
+    """
+    import re as _re
+    llm_ok, llm_error = _check_llm_available()
+    if not llm_ok:
+        return {"error": llm_error}
+
+    if len(recent_entries) < 2:
+        return {"suggestions": []}
+
+    # Format recent entries
+    formatted = []
+    for i, e in enumerate(recent_entries):
+        line = f"[{i}] {e.get('date', '')} — {e.get('content', '')[:300]}"
+        if e.get('tags'):
+            line += f" (Tags: {e['tags']})"
+        formatted.append(line)
+
+    # Format active baustellen
+    if active_baustellen:
+        active_str = "\n".join(
+            f"  ID {b['id']}: {b['headline']}" + (f" — {b.get('core_problem', '')}" if b.get('core_problem') else "")
+            for b in active_baustellen
+        )
+    else:
+        active_str = "  (none yet)"
+
+    # Format dismissed patterns
+    dismissed_str = ", ".join(dismissed_slugs) if dismissed_slugs else "(none)"
+
+    system = _get_prompt(
+        "suggest_baustellen_from_entry",
+        active_baustellen=active_str,
+        dismissed_patterns=dismissed_str,
+        recent_entries="\n".join(formatted),
+        new_entry=new_entry_content[:600],
+    )
+
+    response = chat_with_ollama("Analyze for recurring patterns.", system_prompt=system)
+    data, error = _parse_json_response(response, "array")
+    if error:
+        return {"error": error}
+    if not isinstance(data, list):
+        return {"suggestions": []}
+
+    suggestions = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        label = item.get("label", "").strip()
+        if not label:
+            continue
+        confidence = float(item.get("confidence", 0.5))
+        if confidence < 0.5:
+            continue
+        # Generate a stable slug for this pattern
+        slug = _re.sub(r'[^\w\s-]', '', label.lower())
+        slug = _re.sub(r'\s+', '-', slug).strip('-')[:50]
+        if slug in dismissed_slugs:
+            continue
+        suggestions.append({
+            "label": label,
+            "core_problem": item.get("core_problem", ""),
+            "confidence": round(confidence, 2),
+            "existing_baustelle_id": item.get("existing_baustelle_id"),
+            "pattern_slug": slug,
+        })
+
+    return {"suggestions": suggestions[:3]}
 
 
 def generate_daily_question(recent_summaries):

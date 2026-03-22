@@ -243,6 +243,40 @@
         </div>
     </div>
 
+    <!-- Baustelle Create Modal -->
+    <div id="baustelle-create-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="BaustellenManager.hideCreateModal()"></div>
+        <div class="relative bg-white dark:bg-surface-800 rounded-2xl shadow-xl p-6 w-full max-w-md">
+            <h3 class="text-base font-semibold text-surface-900 dark:text-white mb-4">{{ t('ui.dashboard.concerns.new') }}</h3>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">{{ t('ui.dashboard.concerns.create_name') }}</label>
+                    <input id="baustelle-create-headline" type="text"
+                           class="w-full text-sm px-3 py-2 rounded-lg border border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-700 text-surface-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-400"
+                           placeholder="{{ t('ui.dashboard.concerns.create_name_placeholder') }}"
+                           onkeydown="if(event.key==='Enter') BaustellenManager.submitCreate()">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">{{ t('ui.dashboard.concerns.create_description') }}</label>
+                    <textarea id="baustelle-create-description" rows="2"
+                              class="w-full text-sm px-3 py-2 rounded-lg border border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-700 text-surface-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-400 resize-none"
+                              placeholder="{{ t('ui.dashboard.concerns.create_description_placeholder') }}"></textarea>
+                </div>
+                <p id="baustelle-create-error" class="text-xs text-red-500 dark:text-red-400 hidden"></p>
+            </div>
+            <div class="flex gap-2 mt-4">
+                <button onclick="BaustellenManager.submitCreate()"
+                        class="flex-1 text-sm font-medium px-4 py-2 rounded-xl bg-surface-900 dark:bg-white text-white dark:text-surface-900 hover:opacity-90 transition">
+                    {{ t('ui.dashboard.concerns.create_submit') }}
+                </button>
+                <button onclick="BaustellenManager.hideCreateModal()"
+                        class="text-sm font-medium px-4 py-2 rounded-xl bg-surface-100 dark:bg-surface-700 text-surface-700 dark:text-surface-300 hover:bg-surface-200 transition">
+                    {{ t('ui.dashboard.concerns.cancel', default='Cancel') }}
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Big Five Personality -->
     <div class="card-fade-in card-fade-in-delay-6 bg-white dark:bg-surface-800 rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] p-6">
         <div class="flex flex-wrap items-start justify-between gap-3 mb-6">
@@ -310,7 +344,10 @@
         concernsAnalysisFailed: {{ t('ui.dashboard.concerns.analysis_failed') | tojson }},
         concernsCachedNoNew: {{ t('ui.dashboard.concerns.cached_no_new') | tojson }},
         concernsPromptNewName: {{ t('ui.dashboard.concerns.prompt_new_name') | tojson }},
-        concernsPromptStatusTemplate: {{ t('ui.dashboard.concerns.prompt_status', headline='__HEADLINE__', status='__STATUS__') | tojson }}
+        concernsPromptStatusTemplate: {{ t('ui.dashboard.concerns.prompt_status', headline='__HEADLINE__', status='__STATUS__') | tojson }},
+        concernsCreateFailed: {{ t('ui.dashboard.concerns.create_failed', default='Could not create concern') | tojson }},
+        concernsNameRequired: {{ t('ui.dashboard.concerns.name_required', default='Please enter a name') | tojson }},
+        concernsLinkedEntries: {{ t('ui.dashboard.concerns.linked_entries', count='__COUNT__', default='__COUNT__ entries linked') | tojson }}
     };
 
     // ── Emotion colors ─────────────────────────────────────────────
@@ -593,6 +630,7 @@
                             <div class="mt-1 flex items-center gap-2 text-[10px] text-surface-400">
                                 <span>${b.entry_count} ${i18n.concernsEntriesSuffix}</span>
                                 ${b.is_auto_generated ? `<span>• ${i18n.concernsAuto}</span>` : `<span>• ${i18n.concernsManual}</span>`}
+                                ${b.entry_count >= 5 ? '<span class="text-green-500">• ●●●</span>' : b.entry_count >= 3 ? '<span class="text-yellow-400">• ●●○</span>' : b.entry_count >= 1 ? '<span class="text-surface-400">• ●○○</span>' : ''}
                             </div>
                         </div>
                         <div class="flex-shrink-0 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -662,31 +700,55 @@
         },
 
         showCreateModal() {
-            // Simple prompt for now - could be enhanced to a modal
-            const headline = prompt(i18n.concernsPromptNewName);
-            if (!headline) return;
-            
-            this.create(headline);
+            const modal = document.getElementById('baustelle-create-modal');
+            if (modal) {
+                document.getElementById('baustelle-create-headline').value = '';
+                document.getElementById('baustelle-create-description').value = '';
+                document.getElementById('baustelle-create-error').textContent = '';
+                modal.classList.remove('hidden');
+                document.getElementById('baustelle-create-headline').focus();
+            }
         },
 
-        async create(headline) {
+        hideCreateModal() {
+            const modal = document.getElementById('baustelle-create-modal');
+            if (modal) modal.classList.add('hidden');
+        },
+
+        async create(headline, core_problem) {
             try {
                 const resp = await fetch('/api/baustellen', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
+                    body: JSON.stringify({
                         headline,
+                        core_problem: core_problem || null,
                         status: 'stable',
                         urgency: 3
                     })
                 });
-                
+                const data = await resp.json();
+
                 if (resp.ok) {
+                    this.hideCreateModal();
                     this.load();
+                } else {
+                    document.getElementById('baustelle-create-error').textContent = data.error || i18n.concernsCreateFailed;
                 }
             } catch (e) {
                 console.error('Failed to create Baustelle:', e);
             }
+        },
+
+        submitCreate() {
+            const headline = document.getElementById('baustelle-create-headline').value.trim();
+            if (!headline) {
+                document.getElementById('baustelle-create-error').textContent = i18n.concernsNameRequired;
+                document.getElementById('baustelle-create-error').classList.remove('hidden');
+                return;
+            }
+            const core_problem = document.getElementById('baustelle-create-description').value.trim();
+            this.create(headline, core_problem);
         },
 
         showEditModal(id) {

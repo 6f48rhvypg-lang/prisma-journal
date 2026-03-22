@@ -85,6 +85,9 @@ from database.db import (
     has_previous_entries,
     replace_daily_question,
     get_dataset_hash,
+    dismiss_baustellen_suggestion,
+    get_dismissed_baustellen_slugs,
+    get_recent_entries_for_pattern_analysis,
 )
 from models.vector_store import (
     add_entry as vector_add,
@@ -111,6 +114,7 @@ from utils.ai import (
     generate_daily_question,
     suggest_tags,
     generate_baustellen_analysis,
+    suggest_baustellen_for_entry,
 )
 from utils.voice import transcribe_audio
 from utils.image_gen import (
@@ -721,7 +725,7 @@ def new_entry():
         # Index in vector store (with metadata)
         _reindex_entry(entry_id)
 
-        return redirect(url_for("view_entry", entry_id=entry_id))
+        return redirect(url_for("view_entry", entry_id=entry_id, new=1))
 
     category = request.args.get("category")
     daily_question = request.args.get("daily_question")
@@ -758,12 +762,14 @@ def view_entry(entry_id):
             if e:
                 similar_entries.append(e)
     default_style = get_setting("sd_default_style", Config.SD_DEFAULT_STYLE)
+    suggest_baustellen = request.args.get("new") == "1"
     return render_template(
         "entry_view.html",
         entry=entry,
         similar=similar_entries,
         style_options=ARTWORK_STYLES,
         default_style=default_style,
+        suggest_baustellen=suggest_baustellen,
     )
 
 
@@ -2147,13 +2153,25 @@ def api_create_baustelle():
             is_pinned=is_pinned,
             is_auto_generated=0  # Manual creation
         )
-        
+
         # Link tags if provided
         tags = data.get("tags", [])
         for tag in tags:
             link_tag_to_baustelle(baustelle_id, tag, weight=1.0, is_primary=(tag == tags[0] if tags else False))
-        
-        return jsonify({"id": baustelle_id, "success": True}), 201
+
+        # Auto-link semantically similar entries using vector search
+        from database.db import link_entry_to_baustelle as _link
+        similar = search_similar(headline + " " + (core_problem or ""), n_results=10)
+        linked_count = 0
+        for hit in similar:
+            sim_score = hit.get("distance", 1.0)
+            # distance is cosine distance (0=identical, 2=opposite); convert to confidence
+            confidence = max(0.0, min(1.0, 1.0 - (sim_score / 2.0)))
+            if confidence >= 0.4:
+                _link(hit["entry_id"], baustelle_id, confidence=round(confidence, 2), link_source="auto")
+                linked_count += 1
+
+        return jsonify({"id": baustelle_id, "success": True, "linked_entries": linked_count}), 201
     except Exception as e:
         log.error("Failed to create Baustelle: %s", e)
         return jsonify({"error": str(e)}), 500
@@ -2452,6 +2470,98 @@ def api_analyze_baustellen():
         "count": len(baustellen_data),
         "auto_create": auto_create
     })
+
+
+@app.route("/api/baustellen/suggest", methods=["POST"])
+def api_suggest_baustellen():
+    """Analyze a saved entry and suggest Baustellen patterns."""
+    from database.db import get_all_baustellen, link_entry_to_baustelle as _link
+
+    data = request.get_json() or {}
+    entry_id = data.get("entry_id")
+    if not entry_id:
+        return jsonify({"error": "entry_id required"}), 400
+
+    entry = get_entry(entry_id)
+    if not entry:
+        return jsonify({"error": "Entry not found"}), 404
+
+    if not status.llm_ok:
+        return jsonify({"suggestions": [], "message": "AI offline"}), 200
+
+    recent = get_recent_entries_for_pattern_analysis(limit=20, exclude_id=entry_id)
+    if len(recent) < 2:
+        return jsonify({"suggestions": []})
+
+    active = [{"id": b["id"], "headline": b["headline"], "core_problem": b.get("core_problem", "")}
+              for b in get_all_baustellen(include_inactive=False)]
+    dismissed = get_dismissed_baustellen_slugs()
+
+    result = suggest_baustellen_for_entry(
+        entry["content"], recent, active, dismissed
+    )
+
+    if "error" in result:
+        return jsonify({"suggestions": [], "error": result["error"]}), 200
+
+    # Auto-link entry to any existing baustelle that was matched
+    for s in result.get("suggestions", []):
+        if s.get("existing_baustelle_id"):
+            try:
+                _link(entry_id, s["existing_baustelle_id"],
+                      confidence=s["confidence"], link_source="auto")
+            except Exception:
+                pass
+
+    return jsonify(result)
+
+
+@app.route("/api/baustellen/confirm", methods=["POST"])
+def api_confirm_baustelle():
+    """Confirm a suggested Baustelle (create new or reinforce existing)."""
+    from database.db import create_baustelle, link_entry_to_baustelle as _link
+
+    data = request.get_json() or {}
+    label = data.get("label", "").strip()
+    if not label:
+        return jsonify({"error": "label required"}), 400
+
+    core_problem = data.get("core_problem", "").strip() or None
+    confidence = float(data.get("confidence", 0.7))
+    entry_ids = data.get("entry_ids", [])
+    existing_id = data.get("existing_baustelle_id")
+
+    try:
+        if existing_id:
+            baustelle_id = existing_id
+        else:
+            baustelle_id = create_baustelle(
+                headline=label,
+                core_problem=core_problem,
+                status="stable",
+                urgency=3,
+                is_auto_generated=1,
+            )
+
+        for eid in entry_ids:
+            _link(eid, baustelle_id, confidence=confidence, link_source="user")
+
+        return jsonify({"id": baustelle_id, "success": True})
+    except Exception as e:
+        log.error("Failed to confirm Baustelle: %s", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/baustellen/dismiss", methods=["POST"])
+def api_dismiss_baustelle_suggestion():
+    """Dismiss a Baustellen pattern suggestion so it won't re-appear."""
+    data = request.get_json() or {}
+    pattern_slug = data.get("pattern_slug", "").strip()
+    if not pattern_slug:
+        return jsonify({"error": "pattern_slug required"}), 400
+
+    dismiss_baustellen_suggestion(pattern_slug)
+    return jsonify({"success": True})
 
 
 def _find_similar_baustelle(headline, existing_baustellen, threshold=0.85):

@@ -293,6 +293,14 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_entry_baustellen_entry ON entry_baustellen(entry_id);
         CREATE INDEX IF NOT EXISTS idx_entry_baustellen_baustelle ON entry_baustellen(baustelle_id);
 
+        -- Dismissed Baustellen suggestions (user explicitly ignored these patterns)
+        CREATE TABLE IF NOT EXISTS dismissed_baustellen_suggestions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pattern_slug TEXT NOT NULL UNIQUE,
+            dismissed_count INTEGER NOT NULL DEFAULT 1,
+            dismissed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+
         -- Indexes for frequently queried fields
         CREATE INDEX IF NOT EXISTS idx_entries_created_at
             ON entries(created_at DESC);
@@ -1910,6 +1918,64 @@ def find_baustellen_by_tags(tag_names, min_match=1):
             tag_names + [min_match]
         ).fetchall()
         return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def dismiss_baustellen_suggestion(pattern_slug):
+    """Record that a user dismissed a pattern suggestion."""
+    conn = get_connection()
+    try:
+        conn.execute(
+            """INSERT INTO dismissed_baustellen_suggestions (pattern_slug, dismissed_count, dismissed_at)
+               VALUES (?, 1, CURRENT_TIMESTAMP)
+               ON CONFLICT(pattern_slug) DO UPDATE SET
+                   dismissed_count = dismissed_count + 1,
+                   dismissed_at = CURRENT_TIMESTAMP""",
+            (pattern_slug,)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_dismissed_baustellen_slugs():
+    """Return list of pattern slugs the user has dismissed."""
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            "SELECT pattern_slug FROM dismissed_baustellen_suggestions"
+        ).fetchall()
+        return [r["pattern_slug"] for r in rows]
+    finally:
+        conn.close()
+
+
+def get_recent_entries_for_pattern_analysis(limit=20, exclude_id=None):
+    """Get recent entries with content and tags for Baustellen pattern analysis."""
+    conn = get_connection()
+    try:
+        params = []
+        sql = """SELECT e.id, e.created_at, e.content, e.summary,
+                        GROUP_CONCAT(t.tag_name, ', ') as tags
+                 FROM entries e
+                 LEFT JOIN tags t ON e.id = t.entry_id"""
+        if exclude_id:
+            sql += " WHERE e.id != ?"
+            params.append(exclude_id)
+        sql += " GROUP BY e.id ORDER BY e.created_at DESC LIMIT ?"
+        params.append(limit)
+        rows = conn.execute(sql, params).fetchall()
+        result = []
+        for r in rows:
+            result.append({
+                "id": r["id"],
+                "date": r["created_at"][:10] if r["created_at"] else "",
+                "content": r["content"][:400] if r["content"] else "",
+                "tags": r["tags"] or "",
+                "summary": r["summary"] or "",
+            })
+        return result
     finally:
         conn.close()
 

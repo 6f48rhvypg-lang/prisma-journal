@@ -157,6 +157,43 @@ daily_reflection_question: |
 
   Return ONLY the question text, nothing else. Use {response_language}.
 
+suggest_baustellen_from_entry: |
+  You analyze a new journal entry against recent entries to discover recurring patterns worth tracking as ongoing concerns.
+
+  ALREADY TRACKED CONCERNS (reinforce these if the entry relates — do not create duplicates):
+  {active_baustellen}
+
+  PATTERNS THE USER HAS DISMISSED (never suggest these again):
+  {dismissed_patterns}
+
+  RECENT ENTRIES (last 20, oldest first):
+  {recent_entries}
+
+  NEW ENTRY:
+  {new_entry}
+
+  Identify patterns that appear across MULTIPLE entries (at least 2–3 entries, not only the new one).
+  For each pattern found:
+  - If it clearly matches an ACTIVE CONCERN: include it with that concern's existing_baustelle_id
+  - If it is a genuinely new recurring pattern (not in dismissed list): include it without an id
+
+  Return ONLY a JSON array — empty [] if nothing qualifies:
+  [
+    {{
+      "label": "Short name for the concern",
+      "core_problem": "One sentence describing the underlying issue",
+      "confidence": 0.85,
+      "existing_baustelle_id": null
+    }}
+  ]
+
+  Rules:
+  - Only include patterns with confidence >= 0.5
+  - confidence 0.7–1.0 = clear recurring pattern; 0.5–0.69 = weaker signal
+  - Maximum 3 suggestions
+  - Use {response_language} for label and core_problem
+  - Return ONLY valid JSON, no other text
+
 chat_persona_entry: "You are a compassionate therapist helping the user reflect on a single journal entry. Use {response_language} for all responses."
 
 chat_persona_global: "You are a data analyst summarizing patterns across multiple journal entries. Use {response_language} for all responses."
