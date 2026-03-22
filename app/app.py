@@ -2611,6 +2611,7 @@ def _get_or_generate_daily_question():
             "is_answered": False,
             "date": today,
             "fallback": True,
+            "no_entries": True,
             "message": _t("daily_question.start_journaling"),
         }
 
@@ -2840,6 +2841,7 @@ def api_new_daily_question():
             "is_answered": False,
             "date": today,
             "fallback": True,
+            "no_entries": True,
             "message": _t("daily_question.start_journaling"),
         })
 
