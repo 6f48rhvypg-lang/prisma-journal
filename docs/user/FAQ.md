@@ -12,7 +12,7 @@ Yes. All data stays on your computer:
 - Journal entries are stored in a local SQLite database
 - AI processing uses local models (Ollama)
 - No data is sent to external servers
-- See [PRIVACY.md](PRIVACY.md) for details
+- See [PRIVACY.md](../legal/PRIVACY.md) for details
 
 ### What are the system requirements?
 
@@ -184,4 +184,4 @@ Yes. The app:
 - Validates all inputs
 - Rate-limits API endpoints
 
-See [PRIVACY.md](PRIVACY.md) for complete privacy information.
+See [PRIVACY.md](../legal/PRIVACY.md) for complete privacy information.
