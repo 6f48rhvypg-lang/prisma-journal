@@ -3,244 +3,19 @@ import re
 import time
 import requests
 from config import Config
+from utils.i18n import get_prompt, translate
 
 log = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Default System Prompts (fallback if DB unavailable)
+# Legacy prompt keys mapping (for backward compatibility)
+# Now all prompts are in i18n.py
 # ---------------------------------------------------------------------------
-
-_DEFAULT_PROMPTS = {
-    "analyze_entry": (
-        "You are an empathetic journaling coach. Analyze the journal entry and provide:\n"
-        "1. **Emotional Tone** - The primary emotions expressed\n"
-        "2. **Key Themes** - Main topics or concerns\n"
-        "3. **Cognitive Patterns** - Any thinking patterns (positive or limiting)\n"
-        "4. **Reframe** - A constructive reframe of any negative thoughts\n"
-        "5. **Follow-up Prompt** - One thought-provoking question to go deeper\n\n"
-        "Keep your response concise and supportive.\n\n"
-        "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-        "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-        "Alle Texte müssen auf Deutsch verfasst sein."
-    ),
-    "suggest_title": (
-        "Generate a short, evocative title (max 8 words) for this journal entry. "
-        "Return only the title, no quotes or extra text.\n\n"
-        "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-        "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-        "Alle Texte müssen auf Deutsch verfasst sein."
-    ),
-    "generate_image_prompt": (
-        "Based on this journal entry, create a short Stable Diffusion image prompt "
-        "(max 50 words) that captures the mood and theme as {style} art. "
-        "Return only the prompt.\n\n"
-        "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-        "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-        "Alle Texte müssen auf Deutsch verfasst sein."
-    ),
-    "generate_deeper_questions": (
-        "You are a thoughtful journaling coach. Generate an insightful follow-up question that:\n"
-        "1. Helps explore emotions more deeply\n"
-        "2. Identifies underlying motivations or patterns\n"
-        "3. Considers different perspectives\n"
-        "4. Is open-ended, not yes/no\n"
-        "5. Feels supportive, not interrogative\n\n"
-        "Return ONE question only. No preface, no list.\n\n"
-        "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-        "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-        "Alle Texte müssen auf Deutsch verfasst sein."
-    ),
-    "generate_deeper_questions_followup": (
-        "You are a thoughtful journaling coach. The user already received these questions:\n"
-        "{previous_questions}\n\n"
-        "Generate ONE new follow-up question that is VERY DIFFERENT in angle, wording, and focus from all previous questions.\n"
-        "Do not repeat topics already covered. Be fresh, specific, and open-ended.\n\n"
-        "Return ONE question only. No preface, no list.\n\n"
-        "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-        "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-        "Alle Texte müssen auf Deutsch verfasst sein."
-    ),
-    "generate_summary_and_title": (
-        "# Rolle und Ziel\n"
-        "Du bist ein erfahrener Analytiker mit einem besonderen Talent f\u00fcr Textanalyse und Zusammenfassung. "
-        "Dein Ziel ist es, den folgenden Tagebucheintrag zu analysieren und eine strukturierte \u00dcbersicht zu erstellen.\n\n"
-        "# Anweisungen\n"
-        "1.  Analysiere den Tagebucheintrag gr\u00fcndlich.\n"
-        "2.  Erstelle auf Basis dieser Analyse ein JSON-Objekt mit den folgenden drei Feldern:\n"
-        "    - \"title\": Ein kurzer, aussagekr\u00e4ftiger Titel (max. 8 W\u00f6rter), der das zentrale Thema einf\u00e4ngt.\n"
-        "    - \"summary\": Eine kurze Zusammenfassung in 2-3 S\u00e4tzen, die die wichtigsten Punkte wiedergibt.\n"
-        "    - \"themes\": Ein Array mit 2-5 zentralen Themen oder Stichw\u00f6rtern, die im Eintrag behandelt werden.\n\n"
-        "# Ausgabeformat\n"
-        "Gib ausschlie\u00dflich ein valides JSON-Objekt aus, ohne jegliche Zus\u00e4tze, Kommentare oder Markdown-Formatierung. "
-        "Das JSON muss genau diese Struktur haben: {\"title\": \"...\", \"summary\": \"...\", \"themes\": [\"...\", \"...\"]}\n\n"
-        "# Wichtig\n"
-        "Alle Texte (Titel, Zusammenfassung, Themen) müssen auf Deutsch verfasst sein.\n\n"
-        "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-        "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-        "Alle Texte müssen auf Deutsch verfasst sein."
-    ),
-    "detect_emotions": (
-        "You are an emotion analyst using Plutchik's wheel. Analyze this journal entry for emotions.\n"
-        "Valid emotions: {emotions_list}\n\n"
-        "Return a JSON object with:\n"
-        '- "emotions": Array of detected emotions, each with:\n'
-        '  - "emotion": one of the valid emotions\n'
-        '  - "intensity": "low", "medium", or "high"\n'
-        '  - "frequency": 0.0-1.0 (how prominent in the text)\n'
-        '  - "passage": a short quote from the text showing this emotion\n\n'
-        "Only include emotions actually present. Return ONLY valid JSON."
-    ),
-    "identify_patterns": (
-        "You are a CBT-trained cognitive analyst. Analyze this journal entry for thinking patterns.\n"
-        "{themes_hint}"
-        "Return a JSON object with:\n"
-        '- "cognitive_distortions": Array of any cognitive distortions found, each with:\n'
-        '  - "type": name of distortion (e.g., "all-or-nothing thinking", "catastrophizing", "mind reading")\n'
-        '  - "example": quote from text showing this pattern\n'
-        '  - "reframe": a healthier alternative perspective\n'
-        '- "recurring_themes": Array of themes that might recur in their journaling\n'
-        '- "sentiment_trend": "positive", "negative", "mixed", or "neutral"\n'
-        '- "growth_areas": Array of 1-3 areas for personal growth or reflection\n\n'
-        "Be supportive, not critical. Return ONLY valid JSON.\n\n"
-        "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-        "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-        "Alle Texte müssen auf Deutsch verfasst sein."
-    ),
-    "generate_artwork_prompt": (
-        "Create a Stable Diffusion prompt (max 50 words) for abstract {style} art.\n"
-        "The artwork should capture the mood and themes below WITHOUT including any specific personal details.\n"
-        "Focus on colors, shapes, textures, and abstract representations.\n"
-        "Return ONLY the prompt text, nothing else.\n\n"
-        "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-        "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-        "Alle Texte müssen auf Deutsch verfasst sein."
-    ),
-    "generate_personalized_prompts": (
-        "You are a thoughtful journaling coach. Based on this user's journal history, "
-        "generate 3 personalized writing prompts that:\n"
-        "1. One prompt to explore an UNDER-EXPLORED topic they haven't written much about\n"
-        "2. One prompt to REVISIT a theme from their past with fresh perspective\n"
-        "3. One prompt for GROWTH based on patterns you notice\n\n"
-        "Return ONLY a JSON array of 3 objects, each with:\n"
-        '- "category": "explore", "revisit", or "growth"\n'
-        '- "text": the prompt text (open-ended question)\n'
-        '- "reason": brief explanation why this prompt is suggested (1 sentence)\n\n'
-        "Return ONLY valid JSON, no other text.\n\n"
-        "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-        "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-        "Alle Texte müssen auf Deutsch verfasst sein."
-    ),
-    "generate_personalized_prompts_embeddings": (
-        "You are a thoughtful journaling coach. Generate 3 prompts based on this context:\n"
-        "1) Explore an under-explored topic\n"
-        "2) Revisit a theme from months ago\n"
-        "3) Encourage growth based on patterns you infer\n\n"
-        "Return ONLY a JSON array of 3 objects, each with:\n"
-        '- "category": "explore", "revisit", or "growth"\n'
-        '- "text": an open-ended question\n'
-        '- "reason": a brief one-sentence rationale\n\n'
-        "Return ONLY valid JSON, no other text.\n\n"
-        "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-        "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-        "Alle Texte müssen auf Deutsch verfasst sein."
-    ),
-    "generate_big_five_analysis": (
-        "You are a personality analyst. Based on the journal excerpts, provide Big Five insights.\n"
-        "Return ONLY a JSON object with keys: openness, conscientiousness, extraversion, agreeableness, neuroticism.\n"
-        "Each key should map to an object with:\n"
-        '- "summary": 2-3 sentences of insight\n'
-        '- "evidence": array of 2-3 short evidence phrases from the excerpts\n\n'
-        "Timeframe: {timeframe_label}. Avoid clinical language.\n\n"
-        "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-        "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-        "Alle Texte müssen auf Deutsch verfasst sein."
-    ),
-    "generate_recurring_topics": (
-        "You are a journaling insights assistant. Summarize each topic into a short insight.\n"
-        "Return ONLY a JSON array of objects with keys:\n"
-        '- "title": short topic title\n'
-        '- "insight": 2-3 sentence insight\n\n'
-        "Keep the tone supportive and concise.\n\n"
-        "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-        "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-        "Alle Texte müssen auf Deutsch verfasst sein."
-    ),
-    "daily_reflection_question": (
-        "You are a thoughtful journaling coach. Based on the user's recent journal entries, "
-        "generate ONE personalized daily reflection question.\n\n"
-        "The question should:\n"
-        "1. Connect to themes or emotions from their recent writing\n"
-        "2. Be open-ended and thought-provoking\n"
-        "3. Encourage deeper self-reflection\n"
-        "4. Feel fresh and not repetitive\n\n"
-        "IMPORTANT: Always respond in German.\n\n"
-        "Return ONLY the question text, nothing else.\n\n"
-        "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-        "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-        "Alle Texte müssen auf Deutsch verfasst sein."
-    ),
-    "chat_persona_entry": (
-        "You are a compassionate therapist helping the user reflect on a single journal entry.\n\n"
-        "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-        "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-        "Alle Texte müssen auf Deutsch verfasst sein."
-    ),
-    "chat_persona_global": (
-        "You are a data analyst summarizing patterns across multiple journal entries.\n\n"
-        "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-        "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-        "Alle Texte müssen auf Deutsch verfasst sein."
-    ),
-    "tag_extraction": (
-        "Du bist ein Tagging-System für deutsche Tagebucheinträge. Extrahiere EXAKT 5 relevante Tags.\n\n"
-        "ANFORDERUNGEN (streng befolgen):\n"
-        "1. Genau 5 Tags im JSON-Array\n"
-        "2. NUR Kleinbuchstaben\n"
-        "3. Bindestriche für zusammengesetzte Begriffe: \"arbeit-stress\", \"familienessen\"\n"
-        "4. Maximale Länge: 20 Zeichen pro Tag\n"
-        "5. KEINE Artikel, Konjunktionen oder Zeitangaben\n"
-        "6. KEINE der Wörter: der, und, tag, zeit, ding, fühlen, gefühlt, heute, denken, gestern\n\n"
-        "KATEGORIEN (mindestens eine aus jeder relevanten Kategorie wählen):\n"
-        "- Thema: arbeit, familie, gesundheit, projekt, hobby\n"
-        "- Emotion: freude, angst, frustration, dankbarkeit, stress\n"
-        "- Ort: zuhause, arbeitsplatz, unterwegs, urlaub\n"
-        "- Beziehung: partner, freund, kollege, familie\n"
-        "- Aktivität: meeting, spaziergang, kochen, lesen\n\n"
-        "OUTPUT-FORMAT (streng):\n"
-        '[\"tag1\", \"tag2\", \"tag3\", \"tag4\", \"tag5\"]\n\n'
-        "Eintrag:\n{content}\n\n"
-        "WICHTIG: Antworte AUSSCHLIEßLICH auf Deutsch. "
-        "NUR das JSON-Array, keine Erklärungen, kein Markdown."
-    ),
-    "identify_baustellen": (
-        "Analysiere die Tagebucheinträge des Nutzers und identifiziere 3-5 aktive 'Baustellen' "
-        "(ungelöste Probleme, laufende Anliegen, Themen, die den Nutzer aktuell beschäftigen).\n\n"
-        "Eine Baustelle ist ein Thema, das:\n"
-        "- Ungelöst oder unvollständig ist\n"
-        "- Mehrfach in den Einträgen vorkommt oder intensiv behandelt wurde\n"
-        "- Aktuell relevant ist (nicht nur historisch)\n"
-        "- Emotional besetzt oder handlungsrelevant ist\n\n"
-        "Für jede Baustelle gib zurück:\n"
-        '- "headline": Ultra-kurzer, präziser Titel (2-4 Wörter, knackig und klar, keine Sätze)\n'
-        '- "core_problem": 1-2 Sätze, die das Kernproblem beschreiben\n'
-        '- "recent_development": Was hat sich kürzlich entwickelt oder verändert\n'
-        '- "status": Einer von: "escalating" (verschärft sich), "stable" (besteht fort), "improving" (bessert sich), "dormant" (schlummert)\n'
-        '- "urgency": Zahl 1-5 (5 = braucht sofort Aufmerksamkeit, 1 = kann warten)\n'
-        '- "entry_count": Wie viele Einträge beziehen sich auf dieses Thema (Schätzung)\n'
-        '- "last_mentioned": Datum des neuesten Eintrags zu diesem Thema (ISO-Format)\n\n'
-        "Fokus auf: ungelöste Konflikte, laufende Stressfaktoren, wiederkehrende Sorgen, "
-        "unfertige Projekte, aktive Lebens-Herausforderungen, Beziehungsspannungen.\n\n"
-        "Gib NUR ein valides JSON-Array zurück. Kein Markdown, keine Erklärung.\n\n"
-        "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-        "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-        "Alle Texte müssen auf Deutsch verfasst sein."
-    ),
-}
 
 
 def _get_prompt(key, **kwargs):
-    """Get a system prompt from database with fallback to defaults.
+    """Get a system prompt using i18n with language support.
 
     Args:
         key: The prompt key (e.g., 'analyze_entry')
@@ -249,22 +24,53 @@ def _get_prompt(key, **kwargs):
     Returns:
         The prompt text with any {placeholders} substituted
     """
+    lang = Config.DEFAULT_LANGUAGE
+    
+    # Map legacy key names to i18n keys
+    key_mapping = {
+        "analyze_entry": "prompt.analyze_entry",
+        "suggest_title": "prompt.suggest_title",
+        "generate_image_prompt": "prompt.generate_image_prompt",
+        "generate_deeper_questions": "prompt.generate_deeper_questions",
+        "generate_deeper_questions_followup": "prompt.generate_deeper_questions",  # Use same prompt
+        "generate_summary_and_title": "prompt.entry_metadata",
+        "detect_emotions": "prompt.detect_emotions",
+        "identify_patterns": "prompt.identify_patterns",
+        "generate_artwork_prompt": "prompt.generate_artwork_prompt",
+        "generate_personalized_prompts": "prompt.generate_personalized_prompts",
+        "generate_personalized_prompts_embeddings": "prompt.generate_personalized_prompts",
+        "generate_big_five_analysis": "prompt.generate_big_five_analysis",
+        "generate_recurring_topics": "prompt.generate_recurring_topics",
+        "daily_reflection_question": "prompt.daily_reflection_question",
+        "chat_persona_entry": "prompt.chat_persona_entry",
+        "chat_persona_global": "prompt.chat_persona_global",
+        "tag_extraction": "prompt.suggest_tags",
+        "identify_baustellen": "prompt.active_issues",
+        "suggest_baustellen_from_entry": "prompt.suggest_baustellen_from_entry",
+    }
+    
+    i18n_key = key_mapping.get(key, f"prompt.{key}")
+    
     try:
-        from database.db import get_system_prompt
-        prompt = get_system_prompt(key, default=_DEFAULT_PROMPTS.get(key, ""))
+        return get_prompt(i18n_key, lang, **kwargs)
     except Exception as e:
-        log.warning("Failed to load prompt '%s' from DB: %s", key, e)
-        prompt = _DEFAULT_PROMPTS.get(key, "")
+        log.warning(f"Failed to get prompt for key '{key}': {e}")
+        # Fallback to basic English prompt
+        return f"Analyze the following content and return a JSON response. Use {Config.DEFAULT_LANGUAGE} for all text."
 
-    # Apply any format arguments if provided
-    if kwargs and prompt:
-        try:
-            prompt = prompt.format(**kwargs)
-        except KeyError:
-            # Prompt may have placeholders that aren't being filled yet
-            pass
 
-    return prompt
+def _check_llm_available():
+    """Check if the configured LLM provider is available. Returns (is_available, error_message)."""
+    from utils.services import status
+    
+    if Config.LLM_PROVIDER == "lmstudio":
+        if not status.lmstudio:
+            return False, f"LM Studio is not available. {status.lmstudio_message}"
+    else:  # Default to Ollama
+        if not status.ollama:
+            return False, f"Ollama is not available. {status.ollama_message}"
+    
+    return True, ""
 
 
 # ---------------------------------------------------------------------------
@@ -319,21 +125,66 @@ def _make_ollama_request(url, payload, timeout):
         return None, f"[Error: {e}]"
 
 
-def chat_with_ollama(prompt, system_prompt=None, model=None, retry=True, timeout=None):
-    """Send a prompt to the Ollama API and return the response text.
+def _make_lmstudio_request(url, payload, timeout):
+    """Make a single request to LM Studio (OpenAI-compatible) API with error handling."""
+    try:
+        resp = requests.post(url, json=payload, timeout=timeout)
+        resp.raise_for_status()
+        data = resp.json()
+        # Extract content from OpenAI format: choices[0].message.content
+        if "choices" in data and len(data["choices"]) > 0:
+            return data["choices"][0].get("message", {}).get("content", ""), None
+        return "", None
+    except requests.ConnectionError:
+        return None, (
+            "[Error: Cannot connect to LM Studio at "
+            f"{Config.LMSTUDIO_BASE_URL}. Make sure it is running "
+            "with the local server enabled.]"
+        )
+    except requests.Timeout:
+        return None, (
+            f"[Error: LM Studio request timed out after {timeout}s. "
+            "Try a smaller model or increase LMSTUDIO_TIMEOUT.]"
+        )
+    except requests.HTTPError as e:
+        if e.response is not None and e.response.status_code == 404:
+            return None, (
+                f"[Error: Model '{payload.get('model', 'unknown')}' not found in LM Studio. "
+                "Load a model in LM Studio.]"
+            )
+        return None, f"[Error: LM Studio returned HTTP {e.response.status_code if e.response else '?'}]"
+    except Exception as e:
+        return None, f"[Error: {e}]"
+
+
+def chat_with_ollama(prompt, system_prompt=None, model=None, retry=True, timeout=None) -> str:
+    """Send a prompt to the configured LLM provider (Ollama or LM Studio) and return the response text.
 
     Includes retry logic for transient failures with exponential backoff.
 
     Args:
         prompt: The prompt to send
         system_prompt: Optional system prompt
-        model: Optional model override (defaults to Config.OLLAMA_MODEL)
+        model: Optional model override (defaults to configured model)
         retry: Whether to retry on transient failures (default True)
-        timeout: Optional timeout override (defaults to Config.OLLAMA_TIMEOUT)
+        timeout: Optional timeout override (defaults to configured timeout)
 
     Returns:
         Response text on success, or error message string starting with "[Error"
     """
+    # Route to the appropriate provider based on config
+    if Config.LLM_PROVIDER == "lmstudio":
+        response = _chat_with_lmstudio(prompt, system_prompt, model, retry, timeout)
+    else:
+        response = _chat_with_ollama(prompt, system_prompt, model, retry, timeout)
+
+    if isinstance(response, str):
+        return response
+    return "[Error: Empty response from LLM provider.]"
+
+
+def _chat_with_ollama(prompt, system_prompt=None, model=None, retry=True, timeout=None) -> str:
+    """Internal function for Ollama API calls."""
     from utils.services import status
 
     if not status.ollama:
@@ -368,11 +219,11 @@ def chat_with_ollama(prompt, system_prompt=None, model=None, retry=True, timeout
         last_error = error
 
         # Don't retry connection errors that indicate Ollama isn't running
-        if "[Error: Cannot connect" in error:
+        if error and "[Error: Cannot connect" in error:
             break
 
         # Don't retry 404 (model not found)
-        if "not found in Ollama" in error:
+        if error and "not found in Ollama" in error:
             break
 
         # Retry with backoff for other errors
@@ -385,7 +236,68 @@ def chat_with_ollama(prompt, system_prompt=None, model=None, retry=True, timeout
             time.sleep(delay)
 
     log.error("Ollama request failed after %d attempts: %s", max_attempts, last_error)
-    return last_error
+    return last_error or "[Error: Unknown Ollama error.]"
+
+
+def _chat_with_lmstudio(prompt, system_prompt=None, model=None, retry=True, timeout=None) -> str:
+    """Internal function for LM Studio (OpenAI-compatible) API calls."""
+    from utils.services import status
+
+    if not status.lmstudio:
+        return (
+            "[LM Studio is not available. " + status.lmstudio_message + "]"
+        )
+
+    model = model or Config.LMSTUDIO_MODEL
+    timeout = timeout or Config.LMSTUDIO_TIMEOUT
+    url = f"{Config.LMSTUDIO_BASE_URL}/chat/completions"
+
+    # Build messages in OpenAI format
+    messages = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": prompt})
+
+    payload = {
+        "model": model,
+        "messages": messages,
+        "temperature": 0.7,
+        "stream": False,
+    }
+
+    max_attempts = MAX_RETRIES + 1 if retry else 1
+    last_error = None
+
+    for attempt in range(max_attempts):
+        start_time = time.time()
+        result, error = _make_lmstudio_request(url, payload, timeout)
+
+        if result is not None:
+            duration = time.time() - start_time
+            log.debug("LM Studio request completed in %.1fs (attempt %d)", duration, attempt + 1)
+            return result
+
+        last_error = error
+
+        # Don't retry connection errors
+        if error and "[Error: Cannot connect" in error:
+            break
+
+        # Don't retry 404 (model not found)
+        if error and "not found in LM Studio" in error:
+            break
+
+        # Retry with backoff for other errors
+        if attempt < max_attempts - 1:
+            delay = RETRY_BASE_DELAY * (2 ** attempt)
+            log.warning(
+                "LM Studio request failed (attempt %d/%d): %s. Retrying in %.1fs",
+                attempt + 1, max_attempts, error, delay
+            )
+            time.sleep(delay)
+
+    log.error("LM Studio request failed after %d attempts: %s", max_attempts, last_error)
+    return last_error or "[Error: Unknown LM Studio error.]"
 
 
 def analyze_entry(content):
@@ -409,10 +321,9 @@ def generate_image_prompt(content):
 
 def generate_deeper_questions(text, previous_questions=None):
     """Generate a reflective follow-up question for a journal entry."""
-    from utils.services import status
-
-    if not status.ollama:
-        return {"error": f"[Ollama is not available. {status.ollama_message}]"}
+    llm_ok, llm_error = _check_llm_available()
+    if not llm_ok:
+        return {"error": f"[{llm_error}]"}
 
     if not text or len(text.strip()) < 20:
         return {"error": "Entry is too short to generate meaningful questions."}
@@ -483,7 +394,7 @@ def generate_deeper_questions(text, previous_questions=None):
 # JSON Parsing Helper
 # ---------------------------------------------------------------------------
 
-def _parse_json_response(response, expected_type="object"):
+def _parse_json_response(response: str, expected_type="object"):
     """Parse JSON from AI response, handling common formatting issues.
 
     Args:
@@ -554,10 +465,9 @@ def generate_summary_and_title(content):
         dict with keys: summary, title, themes
         or dict with key: error
     """
-    from utils.services import status
-
-    if not status.ollama:
-        return {"error": f"[Ollama is not available. {status.ollama_message}]"}
+    llm_ok, llm_error = _check_llm_available()
+    if not llm_ok:
+        return {"error": f"[{llm_error}]"}
 
     if not content or len(content.strip()) < 10:
         return {"error": "Entry content is too short for analysis."}
@@ -569,6 +479,8 @@ def generate_summary_and_title(content):
     data, error = _parse_json_response(response, "object")
     if error:
         return {"error": error}
+    if not isinstance(data, dict):
+        return {"error": "AI returned unexpected JSON format (expected object)."}
 
     return {
         "title": data.get("title", "Untitled Entry"),
@@ -584,10 +496,9 @@ def detect_emotions(content):
         dict with key: emotions (list of {emotion, intensity, frequency, passages})
         or dict with key: error
     """
-    from utils.services import status
-
-    if not status.ollama:
-        return {"error": f"[Ollama is not available. {status.ollama_message}]"}
+    llm_ok, llm_error = _check_llm_available()
+    if not llm_ok:
+        return {"error": f"[{llm_error}]"}
 
     if not content or len(content.strip()) < 10:
         return {"error": "Entry content is too short for emotion analysis."}
@@ -600,6 +511,8 @@ def detect_emotions(content):
     data, error = _parse_json_response(response, "object")
     if error:
         return {"error": error}
+    if not isinstance(data, dict):
+        return {"error": "AI returned unexpected JSON format (expected object)."}
 
     emotions = data.get("emotions", [])
     # Validate and clean emotions
@@ -635,10 +548,10 @@ def identify_patterns(content, themes=None):
         or dict with key: error
     """
     import json
-    from utils.services import status
 
-    if not status.ollama:
-        return {"error": f"[Ollama is not available. {status.ollama_message}]"}
+    llm_ok, llm_error = _check_llm_available()
+    if not llm_ok:
+        return {"error": f"[{llm_error}]"}
 
     themes_hint = ""
     if themes:
@@ -677,10 +590,9 @@ def generate_artwork_prompt_for_analysis(themes, emotions, sentiment):
         dict with key: artwork_prompt
         or dict with key: error
     """
-    from utils.services import status
-
-    if not status.ollama:
-        return {"error": f"[Ollama is not available. {status.ollama_message}]"}
+    llm_ok, llm_error = _check_llm_available()
+    if not llm_ok:
+        return {"error": f"[{llm_error}]"}
 
     style = Config.SD_DEFAULT_STYLE
 
@@ -720,10 +632,9 @@ def generate_personalized_prompts(themes_history, emotions_history, recent_topic
         or dict with key: error
     """
     import json
-    from utils.services import status
-
-    if not status.ollama:
-        return {"error": f"[Ollama is not available. {status.ollama_message}]"}
+    llm_ok, llm_error = _check_llm_available()
+    if not llm_ok:
+        return {"error": f"[{llm_error}]"}
 
     if entry_count < 3:
         return {"error": "Not enough journal history to generate personalized prompts. Minimum 3 entries required."}
@@ -784,10 +695,10 @@ def generate_personalized_prompts_from_embeddings(
         entry_count: Total number of entries
     """
     import json
-    from utils.services import status
 
-    if not status.ollama:
-        return {"error": f"[Ollama is not available. {status.ollama_message}]"}
+    llm_ok, llm_error = _check_llm_available()
+    if not llm_ok:
+        return {"error": f"[{llm_error}]"}
 
     if entry_count < 3:
         return {"error": "Not enough journal history to generate personalized prompts. Minimum 3 entries required."}
@@ -843,10 +754,9 @@ def generate_big_five_analysis(entry_summaries, timeframe_label):
         dict with keys: openness, conscientiousness, extraversion, agreeableness, neuroticism
         or dict with key: error
     """
-    from utils.services import status
-
-    if not status.ollama:
-        return {"error": f"[Ollama is not available. {status.ollama_message}]"}
+    llm_ok, llm_error = _check_llm_available()
+    if not llm_ok:
+        return {"error": f"[{llm_error}]"}
 
     if not entry_summaries:
         return {"error": "Not enough journal data for personality analysis."}
@@ -859,6 +769,8 @@ def generate_big_five_analysis(entry_summaries, timeframe_label):
     data, error = _parse_json_response(response, "object")
     if error:
         return {"error": error}
+    if not isinstance(data, dict):
+        return {"error": "AI returned unexpected JSON format (expected object)."}
 
     return {
         "openness": data.get("openness", {}),
@@ -879,10 +791,9 @@ def generate_recurring_topics(topic_inputs):
         dict with key: topics (list of {title, insight})
         or dict with key: error
     """
-    from utils.services import status
-
-    if not status.ollama:
-        return {"error": f"[Ollama is not available. {status.ollama_message}]"}
+    llm_ok, llm_error = _check_llm_available()
+    if not llm_ok:
+        return {"error": f"[{llm_error}]"}
 
     if not topic_inputs:
         return {"error": "No topics available."}
@@ -899,6 +810,8 @@ def generate_recurring_topics(topic_inputs):
     data, error = _parse_json_response(response, "array")
     if error:
         return {"error": error}
+    if not isinstance(data, list):
+        return {"error": "AI returned unexpected JSON format (expected array)."}
 
     topics = []
     for item in data:
@@ -921,10 +834,9 @@ def generate_baustellen_analysis(entry_data):
         dict with key: baustellen (list of Baustelle objects)
         or dict with key: error
     """
-    from utils.services import status
-
-    if not status.ollama:
-        return {"error": f"[Ollama is not available. {status.ollama_message}]"}
+    llm_ok, llm_error = _check_llm_available()
+    if not llm_ok:
+        return {"error": f"[{llm_error}]"}
 
     if not entry_data:
         return {"error": "Not enough journal data for Baustellen analysis."}
@@ -950,6 +862,8 @@ def generate_baustellen_analysis(entry_data):
     data, error = _parse_json_response(response, "array")
     if error:
         return {"error": error}
+    if not isinstance(data, list):
+        return {"error": "AI returned unexpected JSON format (expected array)."}
 
     baustellen = []
     for item in data:
@@ -968,6 +882,88 @@ def generate_baustellen_analysis(entry_data):
     return {"baustellen": baustellen}
 
 
+def suggest_baustellen_for_entry(new_entry_content, recent_entries, active_baustellen, dismissed_slugs):
+    """Analyze a new entry against recent entries to suggest Baustellen patterns.
+
+    Args:
+        new_entry_content: string content of the new entry
+        recent_entries: list of dicts {id, date, content, tags, summary}
+        active_baustellen: list of dicts {id, headline, core_problem}
+        dismissed_slugs: list of pattern slugs the user has previously dismissed
+
+    Returns:
+        dict with key: suggestions (list) or error (string)
+        Each suggestion: {label, core_problem, confidence, existing_baustelle_id, pattern_slug}
+    """
+    import re as _re
+    llm_ok, llm_error = _check_llm_available()
+    if not llm_ok:
+        return {"error": llm_error}
+
+    if len(recent_entries) < 2:
+        return {"suggestions": []}
+
+    # Format recent entries
+    formatted = []
+    for i, e in enumerate(recent_entries):
+        line = f"[{i}] {e.get('date', '')} — {e.get('content', '')[:300]}"
+        if e.get('tags'):
+            line += f" (Tags: {e['tags']})"
+        formatted.append(line)
+
+    # Format active baustellen
+    if active_baustellen:
+        active_str = "\n".join(
+            f"  ID {b['id']}: {b['headline']}" + (f" — {b.get('core_problem', '')}" if b.get('core_problem') else "")
+            for b in active_baustellen
+        )
+    else:
+        active_str = "  (none yet)"
+
+    # Format dismissed patterns
+    dismissed_str = ", ".join(dismissed_slugs) if dismissed_slugs else "(none)"
+
+    system = _get_prompt(
+        "suggest_baustellen_from_entry",
+        active_baustellen=active_str,
+        dismissed_patterns=dismissed_str,
+        recent_entries="\n".join(formatted),
+        new_entry=new_entry_content[:600],
+    )
+
+    response = chat_with_ollama("Analyze for recurring patterns.", system_prompt=system)
+    data, error = _parse_json_response(response, "array")
+    if error:
+        return {"error": error}
+    if not isinstance(data, list):
+        return {"suggestions": []}
+
+    suggestions = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        label = item.get("label", "").strip()
+        if not label:
+            continue
+        confidence = float(item.get("confidence", 0.5))
+        if confidence < 0.5:
+            continue
+        # Generate a stable slug for this pattern
+        slug = _re.sub(r'[^\w\s-]', '', label.lower())
+        slug = _re.sub(r'\s+', '-', slug).strip('-')[:50]
+        if slug in dismissed_slugs:
+            continue
+        suggestions.append({
+            "label": label,
+            "core_problem": item.get("core_problem", ""),
+            "confidence": round(confidence, 2),
+            "existing_baustelle_id": item.get("existing_baustelle_id"),
+            "pattern_slug": slug,
+        })
+
+    return {"suggestions": suggestions[:3]}
+
+
 def generate_daily_question(recent_summaries):
     """Generate a personalized daily reflection question from recent entries.
 
@@ -978,10 +974,9 @@ def generate_daily_question(recent_summaries):
         dict with key: question (string)
         or dict with key: error (string)
     """
-    from utils.services import status
-
-    if not status.ollama:
-        return {"error": f"[Ollama is not available. {status.ollama_message}]"}
+    llm_ok, llm_error = _check_llm_available()
+    if not llm_ok:
+        return {"error": f"[{llm_error}]"}
 
     if not recent_summaries:
         return {"error": "No recent entries to generate a personalized question."}
@@ -1006,12 +1001,13 @@ def generate_daily_question(recent_summaries):
 # Tag Suggestion Functions
 # ---------------------------------------------------------------------------
 
-def suggest_tags(content, max_tags=7):
+def suggest_tags(content, max_tags=20, user_existing_tags=None):
     """Extract relevant tags from journal entry content using small model.
 
     Args:
         content: The journal entry text
-        max_tags: Maximum number of tags to return (default 7)
+        max_tags: Maximum number of tags to return (default 15)
+        user_existing_tags: Optional list of tag names the user has used before
 
     Returns:
         dict with keys:
@@ -1019,11 +1015,11 @@ def suggest_tags(content, max_tags=7):
             - "confidence": float (0.0-1.0) based on content length/quality
             - "error": error message if AI unavailable
     """
-    from utils.services import status
     from config import Config
 
-    if not status.ollama:
-        return {"error": f"[Ollama is not available. {status.ollama_message}]"}
+    llm_ok, llm_error = _check_llm_available()
+    if not llm_ok:
+        return {"error": f"[{llm_error}]"}
 
     if not content or len(content.strip()) < Config.TAG_MIN_LENGTH:
         return {
@@ -1038,14 +1034,20 @@ def suggest_tags(content, max_tags=7):
     # Use dedicated tag model (usually smaller/faster)
     tag_model = Config.TAG_MODEL
 
+    # Format existing user tags for the prompt so AI can prefer them
+    if user_existing_tags:
+        existing_tags_str = ", ".join(sorted(user_existing_tags)[:40])
+    else:
+        existing_tags_str = "keine bisherigen Tags vorhanden"
+
     # Get the prompt from database (editable in settings) or fallback to default
-    system_prompt = _get_prompt("tag_extraction")
-    
+    system_prompt = _get_prompt("tag_extraction", existing_tags=existing_tags_str)
+
     response = chat_with_ollama(
         truncated,
-        system_prompt=system_prompt.format(content=truncated),
+        system_prompt=system_prompt,
         model=tag_model,
-        timeout=15  # Short timeout for fast response
+        timeout=20  # Slightly longer for more comprehensive extraction
     )
 
     print(f"[suggest_tags] Raw Ollama response (first 500 chars): {response[:500]}")

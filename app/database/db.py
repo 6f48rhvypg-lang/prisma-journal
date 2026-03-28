@@ -1,4 +1,4 @@
-import functools
+﻿import functools
 import json
 import logging
 import os
@@ -7,8 +7,10 @@ import sqlite3
 import uuid
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
+from typing import Optional
 
 from config import Config
+from utils.i18n import get_prompt, translate
 from utils.cache import cached, invalidate_cache
 
 log = logging.getLogger(__name__)
@@ -22,14 +24,14 @@ log = logging.getLogger(__name__)
 class DatabaseError(Exception):
     """Custom exception for database operations."""
 
-    def __init__(self, operation: str, message: str, original_error: Exception = None):
+    def __init__(self, operation: str, message: str, original_error: Optional[Exception] = None):
         self.operation = operation
         self.message = message
         self.original_error = original_error
         super().__init__(f"Database error during {operation}: {message}")
 
 
-def db_operation(operation_name: str = None):
+def db_operation(operation_name: Optional[str] = None):
     """Decorator for database operations with error handling and logging.
 
     Wraps functions to catch SQLite errors, log them, and optionally re-raise
@@ -206,14 +208,6 @@ def init_db():
             text TEXT NOT NULL
         );
 
-        -- System prompts for AI functions (dynamic, editable)
-        CREATE TABLE IF NOT EXISTS system_prompts (
-            key TEXT PRIMARY KEY,
-            prompt_text TEXT NOT NULL,
-            description TEXT,
-            last_updated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-        );
-
         -- Daily reflection questions
         CREATE TABLE IF NOT EXISTS daily_questions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -299,6 +293,14 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_entry_baustellen_entry ON entry_baustellen(entry_id);
         CREATE INDEX IF NOT EXISTS idx_entry_baustellen_baustelle ON entry_baustellen(baustelle_id);
 
+        -- Dismissed Baustellen suggestions (user explicitly ignored these patterns)
+        CREATE TABLE IF NOT EXISTS dismissed_baustellen_suggestions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pattern_slug TEXT NOT NULL UNIQUE,
+            dismissed_count INTEGER NOT NULL DEFAULT 1,
+            dismissed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+
         -- Indexes for frequently queried fields
         CREATE INDEX IF NOT EXISTS idx_entries_created_at
             ON entries(created_at DESC);
@@ -341,9 +343,6 @@ def init_db():
         _seed_prompts(conn)
     if conn.execute("SELECT COUNT(*) FROM frameworks").fetchone()[0] == 0:
         _seed_frameworks(conn)
-    if conn.execute("SELECT COUNT(*) FROM system_prompts").fetchone()[0] == 0:
-        _seed_system_prompts(conn)
-
     conn.close()
 
 
@@ -352,101 +351,8 @@ def init_db():
 # ---------------------------------------------------------------------------
 
 
-def _backfill_system_prompts(conn):
-    """Insert any new system prompts that don't exist in existing databases."""
-    new_prompts = [
-        (
-            "chat_persona_entry",
-            "You are a compassionate therapist helping the user reflect on a single journal entry.\n\n"
-            "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-            "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-            "Alle Texte müssen auf Deutsch verfasst sein.",
-            "Chat persona for entry-specific conversations",
-        ),
-        (
-            "chat_persona_global",
-            "You are a data analyst summarizing patterns across multiple journal entries.\n\n"
-            "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-            "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-            "Alle Texte müssen auf Deutsch verfasst sein.",
-            "Chat persona for cross-entry conversations",
-        ),
-        (
-            "tag_extraction",
-            "Du bist ein Experte für die Extraktion von Schlagwörtern aus Texten. "
-            "Analysiere diesen Tagebucheintrag und extrahiere 3-7 relevante Tags auf Deutsch.\n\n"
-            "Anforderungen:\n"
-            "- Tags sollten kleingeschrieben sein\n"
-            "- Mischung aus einzelnen Wörtern und kurzen Wortgruppen (max. 2 Wörter)\n"
-            "- Verwende Bindestriche für zusammengesetzte Begriffe: \"arbeit-stress\", \"familienessen\"\n"
-            "- Fokus auf: Themen, Emotionen, Aktivitäten, Beziehungen\n"
-            "- Priorisiere spezifische, bedeutungsvolle Kategorien\n"
-            "- Vermeide: der, und, tag, zeit, ding, fühlen, gefühlt, heute, denken\n\n"
-            "Beispiele für gute Tags: arbeit, angst, team-konflikt, deadline, kommunikation, arbeit-stress\n"
-            "Beispiele für schlechte Tags: heute, gefühlt, dinge, arbeit und leben\n\n"
-            "Gib NUR ein JSON-Array zurück wie: [\"tag1\", \"tag2\", \"tag3\"]\n"
-            "Keine Erklärung, kein Markdown, nur das JSON-Array.\n\n"
-            "Eintrag:\n{content}\n\n"
-            "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-            "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-            "Alle Texte müssen auf Deutsch verfasst sein.",
-            "Extract tags from journal entry content",
-        ),
-        (
-            "generate_deeper_questions_followup",
-            "Du bist ein nachdenklicher Journaling-Coach. Der Nutzer hat bereits diese Fragen erhalten:\n"
-            "{previous_questions}\n\n"
-            "Formuliere EINE neue Folgefrage, die in Perspektive, Formulierung und Fokus deutlich anders ist als alle bisherigen Fragen. "
-            "Wiederhole keine bereits behandelten Themen. Sei konkret, frisch und offen formuliert.\n\n"
-            "Gib NUR die einzelne Frage aus. Keine Einleitung, keine Liste.\n\n"
-            "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-            "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-            "Alle Texte müssen auf Deutsch verfasst sein.",
-            "Generate a new follow-up question distinct from previous ones",
-        ),
-        (
-            "identify_baustellen",
-            "Analysiere die Tagebucheinträge des Nutzers und identifiziere 3-5 aktive 'Baustellen' "
-            "(ungelöste Probleme, laufende Anliegen, Themen, die den Nutzer aktuell beschäftigen).\n\n"
-            "Eine Baustelle ist ein Thema, das:\n"
-            "- Ungelöst oder unvollständig ist\n"
-            "- Mehrfach in den Einträgen vorkommt oder intensiv behandelt wurde\n"
-            "- Aktuell relevant ist (nicht nur historisch)\n"
-            "- Emotional besetzt oder handlungsrelevant ist\n\n"
-            "Für jede Baustelle gib zurück:\n"
-            '- "headline": Ultra-kurzer, präziser Titel (2-4 Wörter, knackig und klar, keine Sätze)\n'
-            '- "core_problem": 1-2 Sätze, die das Kernproblem beschreiben\n'
-            '- "recent_development": Was hat sich kürzlich entwickelt oder verändert\n'
-            '- "status": Einer von: "escalating" (verschärft sich), "stable" (besteht fort), "improving" (bessert sich), "dormant" (schlummert)\n'
-            '- "urgency": Zahl 1-5 (5 = braucht sofort Aufmerksamkeit, 1 = kann warten)\n'
-            '- "entry_count": Wie viele Einträge beziehen sich auf dieses Thema (Schätzung)\n'
-            '- "last_mentioned": Datum des neuesten Eintrags zu diesem Thema (ISO-Format)\n\n'
-            "Fokus auf: ungelöste Konflikte, laufende Stressfaktoren, wiederkehrende Sorgen, "
-            "unfertige Projekte, aktive Lebens-Herausforderungen, Beziehungsspannungen.\n\n"
-            "Gib NUR ein valides JSON-Array zurück. Kein Markdown, keine Erklärung.\n\n"
-            "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-            "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-            "Alle Texte müssen auf Deutsch verfasst sein.",
-            "Identify active issues and construction sites from journal entries",
-        ),
-    ]
-    for key, prompt_text, description in new_prompts:
-        existing = conn.execute(
-            "SELECT 1 FROM system_prompts WHERE key = ?", (key,)
-        ).fetchone()
-        if not existing:
-            conn.execute(
-                "INSERT INTO system_prompts (key, prompt_text, description) VALUES (?, ?, ?)",
-                (key, prompt_text, description),
-            )
-    conn.commit()
-
-
 def _migrate_schema(conn):
     """Apply schema migrations for existing databases."""
-    # Backfill any new system prompts that don't exist yet
-    _backfill_system_prompts(conn)
-
     # Check if title_image_path column exists on entries table
     cursor = conn.execute("PRAGMA table_info(entries)")
     columns = {row[1] for row in cursor.fetchall()}
@@ -590,273 +496,6 @@ def _backfill_tag_defs_from_existing(conn):
     except Exception as e:
         log.warning("Failed to backfill tag definitions: %s", e)
 
-
-def _seed_system_prompts(conn):
-    """Insert default system prompts for AI functions."""
-    prompts = [
-        (
-            "analyze_entry",
-            "You are an empathetic journaling coach. Analyze the journal entry and provide:\n"
-            "1. **Emotional Tone** - The primary emotions expressed\n"
-            "2. **Key Themes** - Main topics or concerns\n"
-            "3. **Cognitive Patterns** - Any thinking patterns (positive or limiting)\n"
-            "4. **Reframe** - A constructive reframe of any negative thoughts\n"
-            "5. **Follow-up Prompt** - One thought-provoking question to go deeper\n\n"
-            "Keep your response concise and supportive.\n\n"
-            "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-            "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-            "Alle Texte müssen auf Deutsch verfasst sein.",
-            "Empathetic journaling coach for entry analysis"
-        ),
-        (
-            "suggest_title",
-            "Generate a short, evocative title (max 8 words) for this journal entry. "
-            "Return only the title, no quotes or extra text.\n\n"
-            "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-            "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-            "Alle Texte müssen auf Deutsch verfasst sein.",
-            "Generate 8-word titles for entries"
-        ),
-        (
-            "generate_image_prompt",
-            "Based on this journal entry, create a short Stable Diffusion image prompt "
-            "(max 50 words) that captures the mood and theme as {style} art. "
-            "Return only the prompt.\n\n"
-            "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-            "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-            "Alle Texte müssen auf Deutsch verfasst sein.",
-            "Generate SD prompts from entry content"
-        ),
-        (
-            "generate_deeper_questions",
-            "You are a thoughtful journaling coach. Generate insightful follow-up questions that:\n"
-            "1. Help explore emotions more deeply\n"
-            "2. Identify underlying motivations or patterns\n"
-            "3. Consider different perspectives\n"
-            "4. Are open-ended, not yes/no\n"
-            "5. Feel supportive, not interrogative\n\n"
-            "Return ONE question only. No preface, no list.\n\n"
-            "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-            "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-            "Alle Texte müssen auf Deutsch verfasst sein.",
-            "Generate reflective follow-up questions"
-        ),
-        (
-            "generate_deeper_questions_followup",
-            "You are a thoughtful journaling coach. The user already received these questions:\n"
-            "{previous_questions}\n\n"
-            "Generate ONE new follow-up question that is VERY DIFFERENT in angle, wording, and focus from all previous questions.\n"
-            "Do not repeat topics already covered. Be fresh, specific, and open-ended.\n\n"
-            "Return ONE question only. No preface, no list.\n\n"
-            "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-            "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-            "Alle Texte müssen auf Deutsch verfasst sein.",
-            "Generate a new follow-up question distinct from previous ones"
-        ),
-        (
-            "generate_summary_and_title",
-            "# Rolle und Ziel\n"
-            "Du bist ein erfahrener Analytiker mit einem besonderen Talent f\u00fcr Textanalyse und Zusammenfassung. "
-            "Dein Ziel ist es, den folgenden Tagebucheintrag zu analysieren und eine strukturierte \u00dcbersicht zu erstellen.\n\n"
-            "# Anweisungen\n"
-            "1.  Analysiere den Tagebucheintrag gr\u00fcndlich.\n"
-            "2.  Erstelle auf Basis dieser Analyse ein JSON-Objekt mit den folgenden drei Feldern:\n"
-            "    - \"title\": Ein kurzer, aussagekr\u00e4ftiger Titel (max. 8 W\u00f6rter), der das zentrale Thema einf\u00e4ngt.\n"
-            "    - \"summary\": Eine kurze Zusammenfassung in 2-3 S\u00e4tzen, die die wichtigsten Punkte wiedergibt.\n"
-            "    - \"themes\": Ein Array mit 2-5 zentralen Themen oder Stichw\u00f6rtern, die im Eintrag behandelt werden.\n\n"
-            "# Ausgabeformat\n"
-            "Gib ausschlie\u00dflich ein valides JSON-Objekt aus, ohne jegliche Zus\u00e4tze, Kommentare oder Markdown-Formatierung. "
-            "Das JSON muss genau diese Struktur haben: {\"title\": \"...\", \"summary\": \"...\", \"themes\": [\"...\", \"...\"]}\n\n"
-            "# Wichtig\n"
-            "Alle Texte (Titel, Zusammenfassung, Themen) müssen auf Deutsch verfasst sein.\n\n"
-            "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-            "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-            "Alle Texte müssen auf Deutsch verfasst sein.",
-            "Generiere Titel/Zusammenfassung/Themen als JSON"
-        ),
-        (
-            "detect_emotions",
-            "You are an emotion analyst using Plutchik's wheel. Analyze this journal entry for emotions.\n"
-            "Valid emotions: {emotions_list}\n\n"
-            "Return a JSON object with:\n"
-            '- "emotions": Array of detected emotions, each with:\n'
-            '  - "emotion": one of the valid emotions\n'
-            '  - "intensity": "low", "medium", or "high"\n'
-            '  - "frequency": 0.0-1.0 (how prominent in the text)\n'
-            '  - "passage": a short quote from the text showing this emotion\n\n'
-            "Only include emotions actually present. Return ONLY valid JSON.\n\n"
-            "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-            "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-            "Alle Texte müssen auf Deutsch verfasst sein.",
-            "Detect Plutchik emotions in entries"
-        ),
-        (
-            "identify_patterns",
-            "You are a CBT-trained cognitive analyst. Analyze this journal entry for thinking patterns.\n"
-            "{themes_hint}"
-            "Return a JSON object with:\n"
-            '- "cognitive_distortions": Array of any cognitive distortions found, each with:\n'
-            '  - "type": name of distortion (e.g., "all-or-nothing thinking", "catastrophizing", "mind reading")\n'
-            '  - "example": quote from text showing this pattern\n'
-            '  - "reframe": a healthier alternative perspective\n'
-            '- "recurring_themes": Array of themes that might recur in their journaling\n'
-            '- "sentiment_trend": "positive", "negative", "mixed", or "neutral"\n'
-            '- "growth_areas": Array of 1-3 areas for personal growth or reflection\n\n'
-            "Be supportive, not critical. Return ONLY valid JSON.\n\n"
-            "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-            "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-            "Alle Texte müssen auf Deutsch verfasst sein.",
-            "CBT cognitive pattern analysis"
-        ),
-        (
-            "generate_artwork_prompt",
-            "Create a Stable Diffusion prompt (max 50 words) for abstract {style} art.\n"
-            "The artwork should capture the mood and themes below WITHOUT including any specific personal details.\n"
-            "Focus on colors, shapes, textures, and abstract representations.\n"
-            "Return ONLY the prompt text, nothing else.\n\n"
-            "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-            "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-            "Alle Texte müssen auf Deutsch verfasst sein.",
-            "Abstract art prompt from themes/emotions"
-        ),
-        (
-            "generate_personalized_prompts",
-            "You are a thoughtful journaling coach. Based on this user's journal history, "
-            "generate 3 personalized writing prompts that:\n"
-            "1. One prompt to explore an UNDER-EXPLORED topic they haven't written much about\n"
-            "2. One prompt to REVISIT a theme from their past with fresh perspective\n"
-            "3. One prompt for GROWTH based on patterns you notice\n\n"
-            "Return ONLY a JSON array of 3 objects, each with:\n"
-            '- "category": "explore", "revisit", or "growth"\n'
-            '- "text": the prompt text (open-ended question)\n'
-            '- "reason": brief explanation why this prompt is suggested (1 sentence)\n\n'
-            "Return ONLY valid JSON, no other text.\n\n"
-            "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-            "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-            "Alle Texte müssen auf Deutsch verfasst sein.",
-            "Personalized prompts from history"
-        ),
-        (
-            "generate_personalized_prompts_embeddings",
-            "You are a thoughtful journaling coach. Generate 3 prompts based on this context:\n"
-            "1) Explore an under-explored topic\n"
-            "2) Revisit a theme from months ago\n"
-            "3) Encourage growth based on patterns you infer\n\n"
-            "Return ONLY a JSON array of 3 objects, each with:\n"
-            '- "category": "explore", "revisit", or "growth"\n'
-            '- "text": an open-ended question\n'
-            '- "reason": a brief one-sentence rationale\n\n'
-            "Return ONLY valid JSON, no other text.\n\n"
-            "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-            "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-            "Alle Texte müssen auf Deutsch verfasst sein.",
-            "Personalized prompts from embeddings"
-        ),
-        (
-            "generate_big_five_analysis",
-            "You are a personality analyst. Based on the journal excerpts, provide Big Five insights.\n"
-            "Return ONLY a JSON object with keys: openness, conscientiousness, extraversion, agreeableness, neuroticism.\n"
-            "Each key should map to an object with:\n"
-            '- "summary": 2-3 sentences of insight\n'
-            '- "evidence": array of 2-3 short evidence phrases from the excerpts\n\n'
-            "Timeframe: {timeframe_label}. Avoid clinical language.\n\n"
-            "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-            "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-            "Alle Texte müssen auf Deutsch verfasst sein.",
-            "Big Five personality analysis"
-        ),
-        (
-            "generate_recurring_topics",
-            "You are a journaling insights assistant. Summarize each topic into a short insight.\n"
-            "Return ONLY a JSON array of objects with keys:\n"
-            '- "title": short topic title\n'
-            '- "insight": 2-3 sentence insight\n\n'
-            "Keep the tone supportive and concise.\n\n"
-            "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-            "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-            "Alle Texte müssen auf Deutsch verfasst sein.",
-            "Insights for recurring topics"
-        ),
-        (
-            "daily_reflection_question",
-            "You are a thoughtful journaling coach. Based on the user's recent journal entries, "
-            "generate ONE personalized daily reflection question.\n\n"
-            "The question should:\n"
-            "1. Connect to themes or emotions from their recent writing\n"
-            "2. Be open-ended and thought-provoking\n"
-            "3. Encourage deeper self-reflection\n"
-            "4. Feel fresh and not repetitive\n\n"
-            "Return ONLY the question text, nothing else.\n\n"
-            "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-            "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-            "Alle Texte müssen auf Deutsch verfasst sein.",
-            "Generate daily personalized question"
-        ),
-        (
-            "emotion_summary",
-            "You are an empathetic journaling coach. The user has been feeling {emotion} recently.\n"
-            "Based on their journal entries, provide a brief, supportive summary (2-3 sentences) "
-            "explaining why they might be experiencing this emotion and one small suggestion.\n"
-            "Return ONLY the summary text.\n\n"
-            "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-            "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-            "Alle Texte müssen auf Deutsch verfasst sein.",
-            "Summarize why user feels an emotion"
-        ),
-        (
-            "image_generation",
-            "Create an abstract art description (max 50 words) that captures the essence of this journal entry.\n"
-            "Focus on mood, color palette, and abstract shapes rather than literal imagery.\n"
-            "Return ONLY the description.\n\n"
-            "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-            "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-            "Alle Texte müssen auf Deutsch verfasst sein.",
-            "Abstract art description for entry"
-        ),
-        (
-            "chat_persona_entry",
-            "You are a compassionate therapist helping the user reflect on a single journal entry.\n\n"
-            "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-            "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-            "Alle Texte müssen auf Deutsch verfasst sein.",
-            "Chat persona for entry-specific conversations"
-        ),
-        (
-            "chat_persona_global",
-            "You are a data analyst summarizing patterns across multiple journal entries.\n\n"
-            "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-            "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-            "Alle Texte müssen auf Deutsch verfasst sein.",
-            "Chat persona for cross-entry conversations"
-        ),
-        (
-            "tag_extraction",
-            "Du bist ein Experte für die Extraktion von Schlagwörtern aus Texten. "
-            "Analysiere diesen Tagebucheintrag und extrahiere 3-7 relevante Tags auf Deutsch.\n\n"
-            "Anforderungen:\n"
-            "- Tags sollten kleingeschrieben sein\n"
-            "- Mischung aus einzelnen Wörtern und kurzen Wortgruppen (max. 2 Wörter)\n"
-            "- Verwende Bindestriche für zusammengesetzte Begriffe: \"arbeit-stress\", \"familienessen\"\n"
-            "- Fokus auf: Themen, Emotionen, Aktivitäten, Beziehungen\n"
-            "- Priorisiere spezifische, bedeutungsvolle Kategorien\n"
-            "- Vermeide: der, und, tag, zeit, ding, fühlen, gefühlt, heute, denken\n\n"
-            "Beispiele für gute Tags: arbeit, angst, team-konflikt, deadline, kommunikation, arbeit-stress\n"
-            "Beispiele für schlechte Tags: heute, gefühlt, dinge, arbeit und leben\n\n"
-            "Gib NUR ein JSON-Array zurück wie: [\"tag1\", \"tag2\", \"tag3\"]\n"
-            "Keine Erklärung, kein Markdown, nur das JSON-Array.\n\n"
-            "Eintrag:\n{content}\n\n"
-            "WICHTIG: Antworte AUSSCHLIESSLICH auf Deutsch. "
-            "Verwende KEINE anderen Sprachen wie Englisch oder Chinesisch. "
-            "Alle Texte müssen auf Deutsch verfasst sein.",
-            "Extract tags from journal entry content"
-        ),
-    ]
-    conn.executemany(
-        "INSERT INTO system_prompts (key, prompt_text, description) VALUES (?, ?, ?)",
-        prompts,
-    )
-    conn.commit()
-    log.info("Seeded %d system prompts", len(prompts))
 
 
 def _seed_prompts(conn):
@@ -2283,6 +1922,64 @@ def find_baustellen_by_tags(tag_names, min_match=1):
         conn.close()
 
 
+def dismiss_baustellen_suggestion(pattern_slug):
+    """Record that a user dismissed a pattern suggestion."""
+    conn = get_connection()
+    try:
+        conn.execute(
+            """INSERT INTO dismissed_baustellen_suggestions (pattern_slug, dismissed_count, dismissed_at)
+               VALUES (?, 1, CURRENT_TIMESTAMP)
+               ON CONFLICT(pattern_slug) DO UPDATE SET
+                   dismissed_count = dismissed_count + 1,
+                   dismissed_at = CURRENT_TIMESTAMP""",
+            (pattern_slug,)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_dismissed_baustellen_slugs():
+    """Return list of pattern slugs the user has dismissed."""
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            "SELECT pattern_slug FROM dismissed_baustellen_suggestions"
+        ).fetchall()
+        return [r["pattern_slug"] for r in rows]
+    finally:
+        conn.close()
+
+
+def get_recent_entries_for_pattern_analysis(limit=20, exclude_id=None):
+    """Get recent entries with content and tags for Baustellen pattern analysis."""
+    conn = get_connection()
+    try:
+        params = []
+        sql = """SELECT e.id, e.created_at, e.content, e.summary,
+                        GROUP_CONCAT(t.tag_name, ', ') as tags
+                 FROM entries e
+                 LEFT JOIN tags t ON e.id = t.entry_id"""
+        if exclude_id:
+            sql += " WHERE e.id != ?"
+            params.append(exclude_id)
+        sql += " GROUP BY e.id ORDER BY e.created_at DESC LIMIT ?"
+        params.append(limit)
+        rows = conn.execute(sql, params).fetchall()
+        result = []
+        for r in rows:
+            result.append({
+                "id": r["id"],
+                "date": r["created_at"][:10] if r["created_at"] else "",
+                "content": r["content"][:400] if r["content"] else "",
+                "tags": r["tags"] or "",
+                "summary": r["summary"] or "",
+            })
+        return result
+    finally:
+        conn.close()
+
+
 # ---------------------------------------------------------------------------
 # Frameworks CRUD
 # ---------------------------------------------------------------------------
@@ -2404,71 +2101,6 @@ def delete_all_entries_data():
     conn.execute("DELETE FROM entries")
     conn.commit()
     conn.close()
-
-
-# ---------------------------------------------------------------------------
-# System Prompts CRUD
-# ---------------------------------------------------------------------------
-
-
-def get_system_prompt(key, default=None):
-    """Get a system prompt by key, with optional fallback default.
-
-    Args:
-        key: The prompt key (e.g., 'analyze_entry')
-        default: Fallback value if prompt not found
-
-    Returns:
-        The prompt text string, or default if not found
-    """
-    conn = get_connection()
-    try:
-        row = conn.execute(
-            "SELECT prompt_text FROM system_prompts WHERE key = ?", (key,)
-        ).fetchone()
-        return row["prompt_text"] if row else default
-    finally:
-        conn.close()
-
-
-def update_system_prompt(key, prompt_text):
-    """Update a system prompt's text.
-
-    Args:
-        key: The prompt key
-        prompt_text: New prompt text
-
-    Returns:
-        True if updated, False if key not found
-    """
-    conn = get_connection()
-    try:
-        cursor = conn.execute(
-            """UPDATE system_prompts
-               SET prompt_text = ?, last_updated = CURRENT_TIMESTAMP
-               WHERE key = ?""",
-            (prompt_text, key),
-        )
-        conn.commit()
-        return cursor.rowcount > 0
-    finally:
-        conn.close()
-
-
-def get_all_system_prompts():
-    """Get all system prompts with metadata.
-
-    Returns:
-        List of dicts with keys: key, prompt_text, description, last_updated
-    """
-    conn = get_connection()
-    try:
-        rows = conn.execute(
-            "SELECT key, prompt_text, description, last_updated FROM system_prompts ORDER BY key"
-        ).fetchall()
-        return [dict(row) for row in rows]
-    finally:
-        conn.close()
 
 
 # ---------------------------------------------------------------------------
@@ -3352,7 +2984,7 @@ def get_database_stats():
         return {"error": str(e)}
 
 
-def create_backup(backup_path: str = None) -> dict:
+def create_backup(backup_path: Optional[str] = None) -> dict:
     """Create a backup of the database.
 
     Args:

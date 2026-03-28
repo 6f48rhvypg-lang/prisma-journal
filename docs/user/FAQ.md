@@ -23,18 +23,44 @@ Yes. All data stays on your computer:
 
 ## Setup
 
-### How do I install Ollama?
+### How do I install an LLM?
 
+You have two options:
+
+**Option 1: Ollama (Recommended)**
 1. Download from [ollama.ai](https://ollama.ai/)
 2. Install and run Ollama
 3. Pull a model: `ollama pull llama3.2`
 4. The app will auto-detect it
 
+**Option 2: LM Studio**
+1. Download from [lmstudio.ai](https://lmstudio.ai/)
+2. Install and launch LM Studio
+3. Download a model in LM Studio
+4. Start the local inference server
+5. The app will auto-detect it
+
+You can also specify the provider via CLI:
+```bash
+python app\app.py --ollama     # Use Ollama (default)
+python app\app.py --lmstudio  # Use LM Studio
+```
+
+### How do I change the language?
+
+The app supports multiple languages. Start with your preferred language:
+```bash
+python app\app.py --lang en  # English
+python app\app.py --lang de  # German
+```
+
+You can also change the language in the Settings page after launching the app.
+
 ### Why isn't voice input working?
 
 Check these:
 1. Microphone permissions in your browser
-2. Whisper model installed (`pip install openai-whisper`)
+2. Whisper model installed (`python -m pip install --no-build-isolation openai-whisper`)
 3. FFmpeg installed (required by Whisper)
 4. Check `/status` page for service health
 
@@ -45,7 +71,23 @@ Check these:
 3. Set in `.env`: `SD_ENABLED=true`
 4. Set endpoint: `SD_ENDPOINT=http://localhost:7860`
 
-## Features
+### How do I customize the server port and host?
+
+You can specify custom host and port via CLI:
+```bash
+python app\app.py --host 0.0.0.0 --port 8000
+```
+
+This is useful for:
+- Accessing the app from other devices on your network
+- Running multiple instances on different ports
+- Integration with development workflows
+
+## Features & UI
+
+### Does the app support dark mode?
+
+Yes! The app includes built-in dark mode support. You can toggle it in the Settings page for a comfortable viewing experience in low-light environments.
 
 ### What are frameworks?
 
@@ -84,6 +126,7 @@ When writing, click "Go Deeper" to get AI-generated follow-up questions that hel
 2. Activate virtual environment
 3. Install dependencies: `pip install -r requirements.txt`
 4. Check for error messages in terminal
+5. Note: If you encounter issues installing `openai-whisper`, use: `python -m pip install --no-build-isolation openai-whisper`
 
 ### AI features aren't working
 

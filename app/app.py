@@ -3,6 +3,7 @@ import logging
 import re
 import sys
 import os
+import argparse
 from urllib.parse import urlparse
 
 # Ensure project root is on the path so config can be imported
@@ -78,15 +79,15 @@ from database.db import (
     DatabaseError,
     check_database_integrity,
     get_database_stats,
-    get_system_prompt,
-    update_system_prompt,
-    get_all_system_prompts,
     get_daily_question,
     create_daily_question,
     mark_daily_question_answered,
     has_previous_entries,
     replace_daily_question,
     get_dataset_hash,
+    dismiss_baustellen_suggestion,
+    get_dismissed_baustellen_slugs,
+    get_recent_entries_for_pattern_analysis,
 )
 from models.vector_store import (
     add_entry as vector_add,
@@ -113,6 +114,7 @@ from utils.ai import (
     generate_daily_question,
     suggest_tags,
     generate_baustellen_analysis,
+    suggest_baustellen_for_entry,
 )
 from utils.voice import transcribe_audio
 from utils.image_gen import (
@@ -133,6 +135,7 @@ from utils.errors import (
     ValidationError,
 )
 from utils.rate_limit import rate_limit
+from utils.i18n import translate as i18n_translate, normalize_language
 
 # ---------------------------------------------------------------------------
 # App setup
@@ -184,13 +187,79 @@ def inject_globals():
     """Make theme colors and service status available to every template."""
     settings = _get_settings_with_defaults()
     theme_name = settings.get("color_theme", Config.COLOR_THEME)
+    language = normalize_language(settings.get("ui_language") or Config.DEFAULT_LANGUAGE)
     return {
         "theme_colors": COLOR_THEMES.get(theme_name, COLOR_THEMES["ocean"]),
         "theme_name": theme_name,
         "service_status": status,
         "ui_settings": settings,
         "ui_body_classes": _ui_body_classes(settings),
+        "ui_language": language,
+        "t": lambda key, **kwargs: i18n_translate(key, language, **kwargs),
     }
+
+
+@app.template_filter('format_date')
+def format_date_filter(date_str, lang=None):
+    """Format a date string based on language preference.
+    
+    Args:
+        date_str: Date string (ISO format or datetime object)
+        lang: Language code ('de' or 'en'). If None, uses current UI language.
+    
+    Returns:
+        Formatted date string:
+        - German (de): DD.MM.YYYY (e.g., 30.06.2026)
+        - English (en): YYYY-MM-DD (e.g., 2026-06-30)
+    """
+    if not date_str:
+        return ""
+    
+    # Parse date string
+    try:
+        if isinstance(date_str, str):
+            # Handle both 'YYYY-MM-DD' and full ISO datetime strings
+            date_str_clean = date_str[:10] if len(date_str) > 10 else date_str
+            date_obj = datetime.fromisoformat(date_str_clean)
+        else:
+            date_obj = date_str
+    except (ValueError, TypeError):
+        return date_str
+    
+    # Get language
+    if lang is None:
+        lang = _current_language()
+    else:
+        lang = normalize_language(lang)
+    
+    # Format based on language
+    if lang == 'de':
+        # German format: DD.MM.YYYY
+        return date_obj.strftime('%d.%m.%Y')
+    else:
+        # English format: YYYY-MM-DD
+        return date_obj.strftime('%Y-%m-%d')
+
+
+def _current_language():
+    return normalize_language(get_setting("ui_language") or Config.DEFAULT_LANGUAGE)
+
+
+def _t(key, **kwargs):
+    return i18n_translate(key, _current_language(), **kwargs)
+
+
+def _translate_frameworks(frameworks):
+    """Translate framework names and descriptions."""
+    translated = []
+    for fw in frameworks:
+        name_key = f"framework.{fw['name'].lower().replace(' ', '_').replace('-', '_')}.name"
+        desc_key = f"framework.{fw['name'].lower().replace(' ', '_').replace('-', '_')}.description"
+        fw_copy = fw.copy()
+        fw_copy['name'] = _t(name_key) or fw['name']
+        fw_copy['description'] = _t(desc_key) or fw['description']
+        translated.append(fw_copy)
+    return translated
 
 
 def _entry_metadata(entry):
@@ -260,6 +329,7 @@ def _settings_defaults():
         "whisper_model": Config.WHISPER_MODEL,
         "voice_auto_edit": "true",
         "voice_language": "auto",
+        "ui_language": normalize_language(Config.DEFAULT_LANGUAGE),
         "theme_mode": "auto",
         "color_theme": Config.COLOR_THEME,
         "font_size": "medium",
@@ -272,7 +342,10 @@ def _settings_defaults():
         "chroma_path": Config.CHROMA_PATH,
         "model_cache_location": Config.MODEL_PATH,
         "debug_mode": str(Config.DEBUG).lower(),
+        "llm_provider": Config.LLM_PROVIDER,
         "ollama_base_url": Config.OLLAMA_BASE_URL,
+        "lmstudio_base_url": Config.LMSTUDIO_BASE_URL,
+        "lmstudio_model": Config.LMSTUDIO_MODEL,
         "sd_endpoint": Config.SD_API_URL,
     }
 
@@ -346,6 +419,7 @@ def _validate_settings(values):
     expect_enum("font_size", ["small", "medium", "large"])
     expect_enum("spacing_density", ["compact", "comfortable"])
     expect_enum("journal_view", ["grid", "list"])
+    expect_enum("ui_language", ["de", "en"])
     expect_enum("retention_period", ["all", "1_year", "2_years"])
     expect_enum("sd_default_style", ARTWORK_STYLES)
     expect_enum("whisper_model", ["tiny", "base", "small", "medium"])
@@ -491,7 +565,7 @@ def _cosine_similarity(vec_a, vec_b):
 
 
 def _cluster_embeddings(records, similarity_threshold=0.78, max_records=200):
-    filtered = [r for r in records if r.get("embedding")]
+    filtered = [r for r in records if r.get("embedding") is not None]
     filtered.sort(key=lambda r: r.get("metadata", {}).get("date", ""), reverse=True)
     filtered = filtered[:max_records]
 
@@ -502,7 +576,7 @@ def _cluster_embeddings(records, similarity_threshold=0.78, max_records=200):
 
     for rec in filtered:
         emb = rec.get("embedding")
-        if not emb:
+        if emb is None:
             continue
         assigned = False
         for cluster in clusters:
@@ -576,16 +650,22 @@ def dashboard():
 
     recent = get_all_entries(limit=3)
     count = get_entry_count()
+    # Only show the "Last week" suggestions label when there is enough recent data.
+    last_week_start = (datetime.now() - timedelta(days=7)).date().isoformat()
+    today = datetime.now().date().isoformat()
+    last_week_count = get_filtered_entry_count(date_from=last_week_start, date_to=today)
+    has_last_week_suggestions = last_week_count >= 3
     prompts = get_random_prompts(3)
     streak = get_streak()
     top_emotion = get_top_emotion()
     popular_tags = get_popular_tags(8)
     total_words = get_total_words()
-    frameworks = get_all_frameworks()
+    frameworks = _translate_frameworks(get_all_frameworks())
     return render_template(
         "dashboard.html",
         entries=recent,
         entry_count=count,
+        has_last_week_suggestions=has_last_week_suggestions,
         prompts=prompts,
         streak=streak,
         top_emotion=top_emotion,
@@ -609,7 +689,7 @@ def new_entry():
                 "entry_form.html",
                 error="Content is required.",
                 prompt=get_random_prompt(),
-                frameworks=get_all_frameworks(),
+                frameworks=_translate_frameworks(get_all_frameworks()),
             )
 
         if len(content) > Config.MAX_ENTRY_LENGTH:
@@ -617,7 +697,7 @@ def new_entry():
                 "entry_form.html",
                 error=f"Entry exceeds maximum length of {Config.MAX_ENTRY_LENGTH:,} characters.",
                 prompt=get_random_prompt(),
-                frameworks=get_all_frameworks(),
+                frameworks=_translate_frameworks(get_all_frameworks()),
             )
 
         if framework_id:
@@ -625,7 +705,7 @@ def new_entry():
 
         # Generate title using AI if Ollama is available
         entry_title = None
-        if status.ollama:
+        if status.llm_ok:
             try:
                 entry_title = suggest_title(content)
             except Exception as e:
@@ -645,7 +725,7 @@ def new_entry():
         # Index in vector store (with metadata)
         _reindex_entry(entry_id)
 
-        return redirect(url_for("view_entry", entry_id=entry_id))
+        return redirect(url_for("view_entry", entry_id=entry_id, new=1))
 
     category = request.args.get("category")
     daily_question = request.args.get("daily_question")
@@ -662,7 +742,7 @@ def new_entry():
     return render_template(
         "entry_form.html",
         prompt=prompt,
-        frameworks=get_all_frameworks(),
+        frameworks=_translate_frameworks(get_all_frameworks()),
         default_entry_type=default_pref,
     )
 
@@ -682,12 +762,14 @@ def view_entry(entry_id):
             if e:
                 similar_entries.append(e)
     default_style = get_setting("sd_default_style", Config.SD_DEFAULT_STYLE)
+    suggest_baustellen = request.args.get("new") == "1"
     return render_template(
         "entry_view.html",
         entry=entry,
         similar=similar_entries,
         style_options=ARTWORK_STYLES,
         default_style=default_style,
+        suggest_baustellen=suggest_baustellen,
     )
 
 
@@ -710,7 +792,7 @@ def edit_entry(entry_id):
                 entry=entry,
                 editing=True,
                 error=f"Entry exceeds maximum length of {Config.MAX_ENTRY_LENGTH:,} characters.",
-                frameworks=get_all_frameworks(),
+                frameworks=_translate_frameworks(get_all_frameworks()),
             )
 
         if framework_id:
@@ -735,7 +817,7 @@ def edit_entry(entry_id):
         "entry_form.html",
         entry=entry,
         editing=True,
-        frameworks=get_all_frameworks(),
+        frameworks=_translate_frameworks(get_all_frameworks()),
     )
 
 
@@ -803,7 +885,7 @@ def journal():
     all_emotions = get_unique_emotions()
     all_tags = get_popular_tags(30)
     all_entry_types = get_unique_entry_types()
-    frameworks = get_all_frameworks()
+    frameworks = _translate_frameworks(get_all_frameworks())
 
     return render_template(
         "journal.html",
@@ -924,65 +1006,9 @@ def settings():
         framework_message = "Framework saved."
     if request.method == "GET":
         settings_data = _get_settings_with_defaults()
-    services = status.summary()
+    services = status.summary(_current_language())
     ollama_models = _get_ollama_models() if status.ollama else []
-    frameworks = get_all_frameworks()
-
-    # System prompts for the prompt editor section
-    system_prompts = get_all_system_prompts()
-
-    # Extract {placeholder} variables from each prompt for display
-    prompt_placeholders = {}
-    for sp in system_prompts:
-        matches = re.findall(r'\{(\w+)\}', sp.get("prompt_text", ""))
-        prompt_placeholders[sp["key"]] = list(dict.fromkeys(matches))  # unique, order-preserved
-
-    # Group prompts by WHERE they are processed in the application
-    # This helps users understand which prompts affect which features
-    prompt_categories = {
-        "📓 Journal Entry (Entry Creation & Analysis)": [
-            "analyze_entry",
-            "generate_summary_and_title",
-            "detect_emotions",
-            "identify_patterns",
-            "generate_artwork_prompt",
-            "generate_deeper_questions",
-            "generate_deeper_questions_followup",
-            "tag_extraction",
-            "suggest_title",
-        ],
-        "🏠 Dashboard (Daily Engagement)": [
-            "daily_reflection_question",
-            "generate_personalized_prompts",
-            "generate_personalized_prompts_embeddings",
-        ],
-        "📊 Insights (Pattern Analysis)": [
-            "generate_big_five_analysis",
-            "generate_recurring_topics",
-            "identify_baustellen",
-        ],
-        "💬 AI Chat (Conversational Assistant)": [
-            "chat_persona_entry",
-            "chat_persona_global",
-        ],
-        "🎨 Image Generation (Artwork)": [
-            "generate_image_prompt",
-        ],
-        "🔧 Unused / Legacy": [
-            "emotion_summary",
-            "image_generation",
-        ],
-    }
-
-    # Category descriptions to help users understand each section
-    prompt_category_descriptions = {
-        "📓 Journal Entry (Entry Creation & Analysis)": "Prompts used when creating entries, analyzing content, detecting emotions, and generating artwork. These affect the 'Finish Entry' flow and entry view page.",
-        "🏠 Dashboard (Daily Engagement)": "Prompts for the homepage features: daily reflection questions and personalized writing suggestions based on your journal history.",
-        "📊 Insights (Pattern Analysis)": "Prompts for the analytics page: Big Five personality analysis and recurring topic insights across multiple entries.",
-        "💬 AI Chat (Conversational Assistant)": "System prompts that define the AI's persona when chatting about entries (therapist mode) or analyzing patterns across entries (analyst mode).",
-        "🎨 Image Generation (Artwork)": "Prompts for generating images directly from entry content via the image generation API.",
-        "🔧 Unused / Legacy": "These prompts are not currently used in the application but are kept for compatibility or future features.",
-    }
+    frameworks = _translate_frameworks(get_all_frameworks())
 
     return render_template(
         "settings.html",
@@ -998,10 +1024,6 @@ def settings():
         settings_message=settings_message,
         settings_errors=settings_errors,
         restart_warnings=restart_warnings,
-        system_prompts=system_prompts,
-        prompt_categories=prompt_categories,
-        prompt_placeholders=prompt_placeholders,
-        prompt_category_descriptions=prompt_category_descriptions,
     )
 
 
@@ -1026,15 +1048,17 @@ def api_analyze():
     if not is_valid:
         return jsonify({"error": error_msg}), 400
 
-    # Check if Ollama is available
-    if not status.ollama:
+    # Check if LLM is available
+    if not status.llm_ok:
         return jsonify({
             "error": "AI analysis is currently unavailable.",
-            "details": status.ollama_message,
+            "details": status.llm_message,
             "recoverable": True,
         }), 503
 
     analysis = analyze_entry(content)
+    if not isinstance(analysis, str):
+        analysis = str(analysis or "")
 
     # Check for AI error in response
     if analysis.startswith("[Error"):
@@ -1249,6 +1273,23 @@ def api_upload_artwork():
     return jsonify({"image_url": url})
 
 
+@app.route("/api/delete/artwork", methods=["POST"])
+def api_delete_artwork():
+    """Delete/reset the artwork for an entry."""
+    data = request.get_json()
+    entry_id = data.get("entry_id")
+    if not entry_id:
+        return jsonify({"error": "entry_id is required"}), 400
+    
+    entry = get_entry(entry_id)
+    if not entry:
+        return jsonify({"error": "Entry not found"}), 404
+    
+    # Clear the artwork_path and artwork_style
+    update_entry(entry_id, artwork_path=None, artwork_style=None)
+    return jsonify({"success": True})
+
+
 @app.route("/api/prompt")
 def api_prompt():
     """Get a random journal prompt."""
@@ -1300,11 +1341,19 @@ def api_insights_big_five():
         date_to=date_to,
     )
     summaries = [_entry_summary_snippet(e) for e in entries if e.get("content")]
-    label = "Gesamt" if not date_from else f"Letzte {range_value} Tage"
+    
+    # Only analyze if there are sufficient entries
+    if len(summaries) < 3:
+        return jsonify({
+            "error": _t("insights.big_five.not_enough_entries"),
+            "message": _t("insights.big_five.min_entries")
+        }), 200
+    
+    label = "Overall" if not date_from else f"Last {range_value} days"
     result = generate_big_five_analysis(summaries, label)
 
     if "error" in result:
-        status_code = 503 if "Ollama" in result["error"] else 400
+        status_code = 503 if "not available" in result["error"].lower() else 400
         return jsonify(result), status_code
 
     # Cache the successful result
@@ -1358,11 +1407,19 @@ def api_insights_baustellen():
                 "emotions": [em.get("emotion") for em in e.get("emotions", [])]
             })
     
+    # Only analyze if there are sufficient entries
+    if len(entry_data) < 5:
+        return jsonify({
+            "baustellen": [],
+            "message": _t("insights.issues.min_entries")
+        })
+    
     # Generate Baustellen analysis
     result = generate_baustellen_analysis(entry_data)
     
     if "error" in result:
-        status_code = 503 if "Ollama" in result["error"] else 400
+        error_text = str(result.get("error", ""))
+        status_code = 503 if "not available" in error_text.lower() else 400
         return jsonify(result), status_code
     
     # Cache successful result
@@ -1402,9 +1459,14 @@ def api_recurring_topics():
             "examples": examples,
         })
 
+    # Only analyze if there are topics to process
+    if not topic_inputs:
+        return jsonify({"topics": []})
+
     result = generate_recurring_topics(topic_inputs)
     if "error" in result:
-        status_code = 503 if "Ollama" in result["error"] else 400
+        error_text = str(result.get("error", ""))
+        status_code = 503 if "not available" in error_text.lower() else 400
         return jsonify(result), status_code
     return jsonify(result)
 
@@ -1498,10 +1560,10 @@ def api_chat():
     if not query:
         return jsonify({"error": "query is required"}), 400
 
-    if not status.ollama:
+    if not status.llm_ok:
         return jsonify({
             "error": "AI chat is currently unavailable.",
-            "details": status.ollama_message,
+            "details": status.llm_message,
             "recoverable": True,
         }), 503
 
@@ -1551,6 +1613,8 @@ def api_chat():
 
     from utils.ai import chat_with_ollama
     reply = chat_with_ollama("\n".join(prompt_parts), system_prompt=system_prompt)
+    if not isinstance(reply, str):
+        reply = str(reply or "")
     if reply.startswith("[Error"):
         return jsonify({"error": reply.strip("[]")}), 503
     return jsonify({"reply": reply})
@@ -1742,6 +1806,17 @@ def api_delete_all_data():
     return jsonify({"deleted": True})
 
 
+@app.route("/api/settings/theme_mode", methods=["POST"])
+def api_settings_theme_mode():
+    """Update theme_mode setting (light/dark/auto) from the toggle button."""
+    data = request.get_json(silent=True) or {}
+    mode = data.get("theme_mode")
+    if mode not in ("light", "dark", "auto"):
+        return jsonify({"error": "invalid theme_mode"}), 400
+    set_setting("theme_mode", mode)
+    return jsonify({"theme_mode": mode})
+
+
 @app.route("/api/settings/export")
 def api_settings_export():
     """Export settings as JSON."""
@@ -1791,62 +1866,7 @@ def api_settings_import():
 def api_refresh_services():
     """Re-check all service availability."""
     refresh_service_status()
-    return jsonify({"services": status.summary()})
-
-
-# ---------------------------------------------------------------------------
-# System Prompts API
-# ---------------------------------------------------------------------------
-
-
-@app.route("/api/system-prompts")
-def api_list_system_prompts():
-    """List all system prompts with metadata."""
-    prompts = get_all_system_prompts()
-    return jsonify({"prompts": prompts})
-
-
-@app.route("/api/system-prompts/<key>")
-def api_get_system_prompt(key):
-    """Get a single system prompt by key."""
-    prompt = get_system_prompt(key)
-    if prompt is None:
-        return jsonify({"error": f"Prompt '{key}' not found"}), 404
-    return jsonify({"key": key, "prompt_text": prompt})
-
-
-@app.route("/api/system-prompts/<key>", methods=["PUT", "POST"])
-def api_update_system_prompt(key):
-    """Update a system prompt's text."""
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "Invalid JSON data"}), 400
-
-    prompt_text = data.get("prompt_text")
-    if not prompt_text or not prompt_text.strip():
-        return jsonify({"error": "prompt_text is required"}), 400
-
-    success = update_system_prompt(key, prompt_text.strip())
-    if not success:
-        return jsonify({"error": f"Prompt '{key}' not found"}), 404
-
-    return jsonify({"success": True, "key": key})
-
-
-@app.route("/api/system-prompts/<key>/reset", methods=["POST"])
-def api_reset_system_prompt(key):
-    """Reset a system prompt to its hardcoded default."""
-    from utils.ai import _DEFAULT_PROMPTS
-
-    default_text = _DEFAULT_PROMPTS.get(key)
-    if default_text is None:
-        return jsonify({"error": f"No default found for prompt '{key}'"}), 404
-
-    success = update_system_prompt(key, default_text)
-    if not success:
-        return jsonify({"error": f"Prompt '{key}' not found in database"}), 404
-
-    return jsonify({"success": True, "key": key, "prompt_text": default_text})
+    return jsonify({"services": status.summary(_current_language())})
 
 
 # ---------------------------------------------------------------------------
@@ -1880,8 +1900,8 @@ def api_suggest_tags():
     
     content = data.get("content", "").strip()
     existing_tags_raw = data.get("existing_tags", []) or []
-    max_existing = min(int(data.get("max_existing", 5)), 8)
-    max_new = min(int(data.get("max_new", 2)), 4)
+    max_existing = min(int(data.get("max_existing", 7)), 10)
+    max_new = min(int(data.get("max_new", 6)), 10)
     
     # Normalize existing tags
     existing_tags = [t.lower().strip().replace(' ', '-') for t in existing_tags_raw if t]
@@ -1910,8 +1930,8 @@ def api_suggest_tags():
         "baustellen_matches": []
     }
     
-    # Check Ollama availability
-    if not status.ollama:
+    # Check LLM availability
+    if not status.llm_ok:
         suggestions["fallback"] = True
         suggestions["message"] = "AI unavailable - showing your popular tags"
         
@@ -1932,20 +1952,21 @@ def api_suggest_tags():
         suggestions["confidence"] = 0.5
         return jsonify(suggestions)
     
-    # Stage 1: Get AI-extracted tags (potential new tags)
-    ai_result = suggest_tags(content, max_tags=10)
+    # Stage 1a: Get existing tags from user's history (needed for AI prompt)
+    user_tags = get_user_tags_with_frequency(days=365, limit=50)
+    user_tag_names = {t["tag_name"] for t in user_tags}
+
+    # Stage 1b: Get AI-extracted tags, passing existing tags so AI can prefer them
+    ai_result = suggest_tags(content, max_tags=20, user_existing_tags=list(user_tag_names))
     print(f"[TagSuggest] AI result: {ai_result}")
 
     ai_error = ai_result.get("error")
     if ai_error:
         print(f"[TagSuggest] AI error: {ai_error}")
 
-    ai_tags = ai_result.get("suggested_tags", []) if not ai_error else []
+    ai_tags_raw = ai_result.get("suggested_tags", []) if not ai_error else []
+    ai_tags = [str(tag) for tag in ai_tags_raw] if isinstance(ai_tags_raw, list) else []
     print(f"[TagSuggest] AI tags extracted: {ai_tags}")
-
-    # Stage 2: Get existing tags from user's history
-    user_tags = get_user_tags_with_frequency(days=90, limit=30)
-    user_tag_names = {t["tag_name"] for t in user_tags}
     print(f"[TagSuggest] User tags from history: {user_tag_names}")
     
     # Stage 3: Find co-occurring tags with existing entry tags
@@ -2072,19 +2093,24 @@ def api_popular_tags():
 @app.route("/api/baustellen", methods=["GET"])
 def api_list_baustellen():
     """List all Baustellen, optionally filtered by status."""
-    from database.db import get_all_baustellen
-    
+    from database.db import get_all_baustellen, get_entry_count
+
     status_filter = request.args.get("status")
     include_inactive = request.args.get("include_inactive", "false").lower() == "true"
     order_by = request.args.get("order_by", "pinned_first")
-    
+
     baustellen = get_all_baustellen(
         status=status_filter,
         include_inactive=include_inactive,
         order_by=order_by
     )
-    
-    return jsonify({"baustellen": baustellen, "count": len(baustellen)})
+
+    return jsonify({
+        "baustellen": baustellen,
+        "count": len(baustellen),
+        "total_entry_count": get_entry_count(),
+        "min_entries_required": 5,
+    })
 
 
 @app.route("/api/baustellen/<int:baustelle_id>", methods=["GET"])
@@ -2132,13 +2158,25 @@ def api_create_baustelle():
             is_pinned=is_pinned,
             is_auto_generated=0  # Manual creation
         )
-        
+
         # Link tags if provided
         tags = data.get("tags", [])
         for tag in tags:
             link_tag_to_baustelle(baustelle_id, tag, weight=1.0, is_primary=(tag == tags[0] if tags else False))
-        
-        return jsonify({"id": baustelle_id, "success": True}), 201
+
+        # Auto-link semantically similar entries using vector search
+        from database.db import link_entry_to_baustelle as _link
+        similar = search_similar(headline + " " + (core_problem or ""), n_results=10)
+        linked_count = 0
+        for hit in similar:
+            sim_score = hit.get("distance", 1.0)
+            # distance is cosine distance (0=identical, 2=opposite); convert to confidence
+            confidence = max(0.0, min(1.0, 1.0 - (sim_score / 2.0)))
+            if confidence >= 0.4:
+                _link(hit["entry_id"], baustelle_id, confidence=round(confidence, 2), link_source="auto")
+                linked_count += 1
+
+        return jsonify({"id": baustelle_id, "success": True, "linked_entries": linked_count}), 201
     except Exception as e:
         log.error("Failed to create Baustelle: %s", e)
         return jsonify({"error": str(e)}), 500
@@ -2366,10 +2404,12 @@ def api_analyze_baustellen():
                 log.warning("Failed to cache Baustellen analysis: %s", e)
     
     if "error" in result:
-        status_code = 503 if "Ollama" in result["error"] else 400
+        error_text = str(result.get("error", ""))
+        status_code = 503 if "not available" in error_text.lower() else 400
         return jsonify(result), status_code
     
-    baustellen_data = result.get("baustellen", [])
+    baustellen_data_raw = result.get("baustellen", [])
+    baustellen_data = [b for b in baustellen_data_raw if isinstance(b, dict)] if isinstance(baustellen_data_raw, list) else []
     
     # If cached, we can skip the DB update logic to prevent "drift" 
     # and just return the data with a flag
@@ -2378,10 +2418,10 @@ def api_analyze_baustellen():
             "baustellen": baustellen_data,
             "count": len(baustellen_data),
             "cached": True,
-            "message": "Keine neuen Einträge seit der letzten Analyse."
+            "message": _t("insights.issues.cached")
         })
     
-    if auto_create and status.ollama:
+    if auto_create and status.llm_ok:
         # Get existing Baustellen to avoid duplicates
         existing = get_all_baustellen(include_inactive=True)
         existing_headlines = {b["headline"].lower() for b in existing}
@@ -2437,6 +2477,98 @@ def api_analyze_baustellen():
     })
 
 
+@app.route("/api/baustellen/suggest", methods=["POST"])
+def api_suggest_baustellen():
+    """Analyze a saved entry and suggest Baustellen patterns."""
+    from database.db import get_all_baustellen, link_entry_to_baustelle as _link
+
+    data = request.get_json() or {}
+    entry_id = data.get("entry_id")
+    if not entry_id:
+        return jsonify({"error": "entry_id required"}), 400
+
+    entry = get_entry(entry_id)
+    if not entry:
+        return jsonify({"error": "Entry not found"}), 404
+
+    if not status.llm_ok:
+        return jsonify({"suggestions": [], "message": "AI offline"}), 200
+
+    recent = get_recent_entries_for_pattern_analysis(limit=20, exclude_id=entry_id)
+    if len(recent) < 2:
+        return jsonify({"suggestions": []})
+
+    active = [{"id": b["id"], "headline": b["headline"], "core_problem": b.get("core_problem", "")}
+              for b in get_all_baustellen(include_inactive=False)]
+    dismissed = get_dismissed_baustellen_slugs()
+
+    result = suggest_baustellen_for_entry(
+        entry["content"], recent, active, dismissed
+    )
+
+    if "error" in result:
+        return jsonify({"suggestions": [], "error": result["error"]}), 200
+
+    # Auto-link entry to any existing baustelle that was matched
+    for s in result.get("suggestions", []):
+        if s.get("existing_baustelle_id"):
+            try:
+                _link(entry_id, s["existing_baustelle_id"],
+                      confidence=s["confidence"], link_source="auto")
+            except Exception:
+                pass
+
+    return jsonify(result)
+
+
+@app.route("/api/baustellen/confirm", methods=["POST"])
+def api_confirm_baustelle():
+    """Confirm a suggested Baustelle (create new or reinforce existing)."""
+    from database.db import create_baustelle, link_entry_to_baustelle as _link
+
+    data = request.get_json() or {}
+    label = data.get("label", "").strip()
+    if not label:
+        return jsonify({"error": "label required"}), 400
+
+    core_problem = data.get("core_problem", "").strip() or None
+    confidence = float(data.get("confidence", 0.7))
+    entry_ids = data.get("entry_ids", [])
+    existing_id = data.get("existing_baustelle_id")
+
+    try:
+        if existing_id:
+            baustelle_id = existing_id
+        else:
+            baustelle_id = create_baustelle(
+                headline=label,
+                core_problem=core_problem,
+                status="stable",
+                urgency=3,
+                is_auto_generated=1,
+            )
+
+        for eid in entry_ids:
+            _link(eid, baustelle_id, confidence=confidence, link_source="user")
+
+        return jsonify({"id": baustelle_id, "success": True})
+    except Exception as e:
+        log.error("Failed to confirm Baustelle: %s", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/baustellen/dismiss", methods=["POST"])
+def api_dismiss_baustelle_suggestion():
+    """Dismiss a Baustellen pattern suggestion so it won't re-appear."""
+    data = request.get_json() or {}
+    pattern_slug = data.get("pattern_slug", "").strip()
+    if not pattern_slug:
+        return jsonify({"error": "pattern_slug required"}), 400
+
+    dismiss_baustellen_suggestion(pattern_slug)
+    return jsonify({"success": True})
+
+
 def _find_similar_baustelle(headline, existing_baustellen, threshold=0.85):
     """Find if a Baustelle with similar headline already exists."""
     import difflib
@@ -2475,23 +2607,24 @@ def _get_or_generate_daily_question():
     # Check if there are previous entries to personalize from
     if not has_previous_entries():
         return {
-            "question": "Was bewegt dich heute?",
+            "question": _t("daily_question.default"),
             "is_new": False,
             "is_answered": False,
             "date": today,
             "fallback": True,
-            "message": "Beginne mit dem Journaling, um personalisierte Fragen zu erhalten!",
+            "no_entries": True,
+            "message": _t("daily_question.start_journaling"),
         }
 
-    # Check if Ollama is available
-    if not status.ollama:
+    # Check if LLM is available
+    if not status.llm_ok:
         return {
-            "question": "Was bewegt dich heute?",
+            "question": _t("daily_question.default"),
             "is_new": False,
             "is_answered": False,
             "date": today,
             "fallback": True,
-            "message": "KI ist offline - Standardfrage wird verwendet",
+            "message": _t("daily_question.ai_offline"),
         }
 
     # Get recent entry summaries to generate a personalized question
@@ -2504,7 +2637,7 @@ def _get_or_generate_daily_question():
 
     if not recent_summaries:
         return {
-            "question": "Was bewegt dich heute?",
+            "question": _t("daily_question.default"),
             "is_new": False,
             "is_answered": False,
             "date": today,
@@ -2515,7 +2648,7 @@ def _get_or_generate_daily_question():
     result = generate_daily_question(recent_summaries)
     if "error" in result:
         return {
-            "question": "Was bewegt dich heute?",
+            "question": _t("daily_question.default"),
             "is_new": False,
             "is_answered": False,
             "date": today,
@@ -2524,7 +2657,7 @@ def _get_or_generate_daily_question():
         }
 
     # Save the generated question
-    question_text = result.get("question", "Was bewegt dich heute?")
+    question_text = result.get("question", _t("daily_question.default"))
     create_daily_question(today, question_text)
 
     return {
@@ -2692,10 +2825,10 @@ def api_new_daily_question():
     if _local_only_block(Config.OLLAMA_BASE_URL):
         return jsonify({"error": "Local-only mode blocks external Ollama endpoint."}), 403
 
-    if not status.ollama:
+    if not status.llm_ok:
         return jsonify({
-            "error": "KI ist nicht verfügbar.",
-            "details": status.ollama_message,
+            "error": _t("ai.unavailable"),
+            "details": status.llm_message,
             "recoverable": True,
         }), 503
 
@@ -2704,12 +2837,13 @@ def api_new_daily_question():
     # Check if there are previous entries to personalize from
     if not has_previous_entries():
         return jsonify({
-            "question": "Was bewegt dich heute?",
+            "question": _t("daily_question.default"),
             "is_new": False,
             "is_answered": False,
             "date": today,
             "fallback": True,
-            "message": "Beginne mit dem Journaling, um personalisierte Fragen zu erhalten!",
+            "no_entries": True,
+            "message": _t("daily_question.start_journaling"),
         })
 
     # Get recent entry summaries to generate a personalized question
@@ -2722,7 +2856,7 @@ def api_new_daily_question():
 
     if not recent_summaries:
         return jsonify({
-            "question": "Was bewegt dich heute?",
+            "question": _t("daily_question.default"),
             "is_new": False,
             "is_answered": False,
             "date": today,
@@ -2738,7 +2872,7 @@ def api_new_daily_question():
         }), 503
 
     # Replace the existing question with the new one
-    question_text = result.get("question", "Was bewegt dich heute?")
+    question_text = result.get("question", _t("daily_question.default"))
     replace_daily_question(today, question_text)
 
     return jsonify({
@@ -2823,11 +2957,15 @@ def api_analyze_entry():
                 yield f"data: {json.dumps({'step': 1, 'status': 'error', 'message': emotions_result['error']})}\n\n"
                 result["emotions"] = []
             else:
-                result["emotions"] = emotions_result.get("emotions", [])
+                raw_emotions = emotions_result.get("emotions", [])
+                result["emotions"] = [
+                    e for e in raw_emotions
+                    if isinstance(e, dict) and e.get("emotion")
+                ] if isinstance(raw_emotions, list) else []
                 # Save emotions to database
                 db_emotions = [
                     {
-                        "emotion": e["emotion"],
+                        "emotion": e.get("emotion"),
                         "intensity": e.get("intensity", "medium"),
                         "frequency": e.get("frequency", 0.5),
                     }
@@ -2919,6 +3057,8 @@ def api_analyze_entry():
         # Step 5: Generate AI Insights (uses the editable analyze_entry prompt)
         yield f"data: {json.dumps({'step': 5, 'status': 'running', 'message': 'Generating AI insights...'})}\n\n"
         insights_result = analyze_entry(content)
+        if not isinstance(insights_result, str):
+            insights_result = str(insights_result or "")
         if insights_result.startswith("[Error"):
             yield f"data: {json.dumps({'step': 5, 'status': 'error', 'message': insights_result})}\n\n"
         else:
@@ -2950,7 +3090,9 @@ def api_analyze_entry():
 @app.route("/status")
 def system_status():
     """Comprehensive system status page."""
-    diagnostics = get_detailed_status()
+    settings = _get_settings_with_defaults()
+    language = normalize_language(settings.get("ui_language") or Config.DEFAULT_LANGUAGE)
+    diagnostics = get_detailed_status(language)
     # Return JSON if requested (for setup wizard)
     if request.args.get("format") == "json":
         return jsonify(diagnostics)
@@ -2960,7 +3102,9 @@ def system_status():
 @app.route("/api/status")
 def api_status():
     """API endpoint for system diagnostics."""
-    diagnostics = get_detailed_status()
+    settings = _get_settings_with_defaults()
+    language = normalize_language(settings.get("ui_language") or Config.DEFAULT_LANGUAGE)
+    diagnostics = get_detailed_status(language)
     return jsonify(diagnostics)
 
 
@@ -2982,11 +3126,13 @@ def api_test_services():
     """Test all services with actual operations."""
     results = {}
 
-    # Test Ollama
-    if status.ollama:
+    # Test LLM
+    if status.llm_ok:
         try:
             from utils.ai import chat_with_ollama
             response = chat_with_ollama("Say 'test successful' in exactly two words.")
+            if not isinstance(response, str):
+                response = str(response or "")
             results["ollama"] = {
                 "success": "error" not in response.lower(),
                 "message": response[:100] if response else "No response",
@@ -3175,12 +3321,102 @@ def log_response(response):
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(
+        description="PrismA Journal - Secure AI-powered journaling app",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python app/app.py                    # Use default LLM provider from .env
+  python app/app.py --ollama           # Force Ollama
+  python app/app.py --lmstudio         # Force LM Studio
+  python app/app.py --language en      # Use English
+  python app/app.py --language de      # Use German (default)
+        """
+    )
+    
+    llm_group = parser.add_mutually_exclusive_group()
+    llm_group.add_argument(
+        "--ollama",
+        action="store_const",
+        const="ollama",
+        dest="llm_provider",
+        help="Use Ollama as LLM provider (overrides .env)"
+    )
+    llm_group.add_argument(
+        "--lmstudio",
+        action="store_const",
+        const="lmstudio",
+        dest="llm_provider",
+        help="Use LM Studio as LLM provider (overrides .env)"
+    )
+    llm_group.add_argument(
+        "--llm",
+        choices=["ollama", "lmstudio"],
+        dest="llm_provider",
+        help="Specify LLM provider explicitly"
+    )
+    
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=5000,
+        help="Port to run the server on (default: 5000)"
+    )
+    
+    parser.add_argument(
+        "--host",
+        default="0.0.0.0",
+        help="Host to bind to (default: 0.0.0.0)"
+    )
+    
+    parser.add_argument(
+        "--language",
+        "--lang",
+        choices=["en", "de"],
+        dest="language",
+        help="Set UI and AI response language: 'en' (English) or 'de' (German, default)"
+    )
+    
+    args = parser.parse_args()
+    
+    # Override Config.LLM_PROVIDER if command-line argument provided
+    if args.llm_provider:
+        Config.LLM_PROVIDER = args.llm_provider.lower()
+        print(f"[CLI Override] LLM Provider set to: {Config.LLM_PROVIDER}")
+    
+    # Override Config.DEFAULT_LANGUAGE if command-line argument provided
+    if args.language:
+        Config.DEFAULT_LANGUAGE = args.language.lower()
+        print(f"[CLI Override] Language set to: {Config.DEFAULT_LANGUAGE}")
+    
     init_services()
     init_db()
+
+    # Always set ui_language to DEFAULT_LANGUAGE on startup (ensures German default).
+    # CLI override takes precedence, otherwise defaults to German.
+    set_setting("ui_language", normalize_language(Config.DEFAULT_LANGUAGE))
+
+    effective_default_language = normalize_language(Config.DEFAULT_LANGUAGE)
+    persisted_ui_language = normalize_language(
+        get_setting("ui_language") or effective_default_language
+    )
+    print(
+        "[Language] "
+        f"DEFAULT_LANGUAGE={effective_default_language} "
+        f"| ui_language={persisted_ui_language}"
+    )
     # Apply data retention policy (delete old entries)
     from database.db import apply_data_retention
     retention_result = apply_data_retention()
     if retention_result.get("deleted_count", 0) > 0:
         print(f"Data retention: deleted {retention_result['deleted_count']} entries "
               f"(policy: {retention_result['retention_policy']})")
-    app.run(debug=Config.DEBUG, host="0.0.0.0", port=5000)
+    
+    # Print the URL before starting the server
+    url = f"http://127.0.0.1:{args.port}" if args.host == "0.0.0.0" else f"http://{args.host}:{args.port}"
+    print(f"\n{'='*60}")
+    print(f"  PrismA Journal is running at: {url}")
+    print(f"{'='*60}\n")
+    
+    app.run(debug=Config.DEBUG, host=args.host, port=args.port)

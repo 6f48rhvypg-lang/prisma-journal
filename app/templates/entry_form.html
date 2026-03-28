@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{% if editing %}Edit Entry{% else %}New Entry{% endif %}{% endblock %}
+{% block title %}{% if editing %}{{ t('ui.entry.edit') }}{% else %}{{ t('ui.dashboard.new_entry') }}{% endif %}{% endblock %}
 
 {% block head %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -40,7 +40,7 @@
 
 {% block content %}
 <div class="max-w-5xl mx-auto">
-    <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-6">{% if editing %}Edit Entry{% else %}New Journal Entry{% endif %}</h1>
+    <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-6">{% if editing %}{{ t('ui.entry.edit') }}{% else %}{{ t('ui.dashboard.new_entry') }}{% endif %}</h1>
 
     <div class="lg:grid lg:grid-cols-[minmax(0,1fr)_260px] lg:gap-8">
         <div>
@@ -59,10 +59,10 @@
         <!-- Framework (shown when entry_type is framework) -->
         {% if frameworks %}
         <div id="framework-section" class="hidden">
-            <label for="framework_id" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Framework</label>
+            <label for="framework_id" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">{{ t('ui.entry.framework_label') }}</label>
             <select id="framework_id" name="framework_id"
                     class="w-full rounded-lg border border-surface-300 dark:border-surface-600 px-4 py-2.5 text-surface-700 dark:text-surface-200 bg-white dark:bg-surface-800">
-                <option value="">None</option>
+                <option value="">{{ t('ui.entry.framework_none') }}</option>
                 {% for fw in frameworks %}
                 <option value="{{ fw.id }}" {% if editing and entry and entry.framework_id == fw.id %}selected{% endif %}>{{ fw.name }} ({{ fw.category }})</option>
                 {% endfor %}
@@ -72,14 +72,14 @@
         <div id="framework-questions-panel" class="hidden border border-surface-200 dark:border-surface-700 rounded-lg bg-white dark:bg-surface-800 overflow-hidden">
             <div class="flex items-center justify-between px-4 py-3 border-b border-surface-100 dark:border-surface-700">
                 <div>
-                    <p class="text-sm font-medium text-surface-700 dark:text-surface-300" id="framework-questions-title">Framework Questions</p>
+                    <p class="text-sm font-medium text-surface-700 dark:text-surface-300" id="framework-questions-title">{{ t('ui.entry.framework_questions') }}</p>
                     <p class="text-xs text-surface-400" id="framework-questions-description"></p>
                 </div>
                 <div class="flex items-center gap-3">
-                    <span class="text-xs text-surface-500" id="framework-questions-progress">0 of 0 answered</span>
+                    <span class="text-xs text-surface-500" id="framework-questions-progress">0 {{ t('ui.entry.framework_answered', current='0', total='0').split(' ')[1] }}</span>
                     <label class="text-xs text-surface-500 flex items-center gap-1.5 cursor-pointer" title="Show one question at a time">
                         <input type="checkbox" id="framework-wizard-mode" class="rounded border-surface-300 dark:border-surface-600 text-primary-600 w-3.5 h-3.5" onchange="toggleWizardMode()">
-                        <span>Step-by-step</span>
+                        <span>{{ t('ui.entry.framework_step_by_step') }}</span>
                     </label>
                 </div>
             </div>
@@ -90,37 +90,37 @@
                 <div class="px-4 py-4" id="framework-wizard-question"></div>
                 <!-- Microlearning tip -->
                 <div id="framework-wizard-tip" class="hidden mx-4 mb-4 p-3 rounded-lg bg-primary-50 dark:bg-primary-900/20 border border-primary-100 dark:border-primary-800">
-                    <p class="text-xs text-primary-700 dark:text-primary-300"><span class="font-medium">Tip:</span> <span id="framework-wizard-tip-text"></span></p>
+                    <p class="text-xs text-primary-700 dark:text-primary-300"><span class="font-medium">{{ t('ui.entry.framework_tip') }}</span> <span id="framework-wizard-tip-text"></span></p>
                 </div>
                 <!-- Navigation -->
                 <div class="px-4 py-3 border-t border-surface-100 dark:border-surface-700 flex items-center justify-between">
                     <button type="button" id="wizard-prev-btn" onclick="wizardPrev()" class="px-4 py-1.5 rounded-lg text-sm font-medium border border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
-                        &larr; Previous
+                        {{ t('ui.entry.framework_previous') }}
                     </button>
-                    <span class="text-sm font-medium text-surface-600 dark:text-surface-400" id="wizard-step-indicator">Question 1 of 5</span>
+                    <span class="text-sm font-medium text-surface-600 dark:text-surface-400" id="wizard-step-indicator">{{ t('ui.entry.framework_question_count', current='1', total='5') }}</span>
                     <button type="button" id="wizard-next-btn" onclick="wizardNext()" class="px-4 py-1.5 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 transition">
-                        Next &rarr;
+                        {{ t('ui.entry.framework_next') }}
                     </button>
                 </div>
             </div>
             <div class="px-4 py-3 border-t border-surface-100 dark:border-surface-700 flex items-center justify-between flex-wrap gap-3">
                 <label class="text-xs text-surface-500 flex items-center gap-2">
                     <input type="checkbox" id="framework-build-content" class="rounded border-surface-300 dark:border-surface-600" checked>
-                    Build entry from answers
+                    {{ t('ui.entry.framework_build_content') }}
                 </label>
-                <p class="text-xs text-surface-400">Skip any question you want.</p>
+                <p class="text-xs text-surface-400">{{ t('ui.entry.framework_skip_hint') }}</p>
             </div>
         </div>
         {% endif %}
 
         <!-- Content -->
         <div>
-            <label for="content" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Content</label>
+            <label for="content" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">{{ t('ui.entry.content') }}</label>
             <textarea id="content" name="content" rows="14"
-                      placeholder="Start writing..."
+                      placeholder="{{ t('ui.dashboard.hero') }}"
                       class="w-full rounded-lg border border-surface-300 dark:border-surface-600 px-4 py-3 text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none resize-y leading-relaxed">{{ entry.content if editing and entry else '' }}</textarea>
             <div class="flex justify-between mt-1">
-                <span class="text-xs text-surface-400" id="word-count">0 words</span>
+                <span class="text-xs text-surface-400" id="word-count">0 {{ t('ui.journal.words', count='0').split()[0] }}</span>
             </div>
         </div>
 
@@ -128,7 +128,7 @@
         <div id="voice-panel" class="border border-surface-200 dark:border-surface-700 rounded-lg bg-white dark:bg-surface-800 overflow-hidden">
             <!-- Panel header -->
             <div class="flex items-center justify-between px-4 py-3 border-b border-surface-100 dark:border-surface-700">
-                <span class="text-sm font-medium text-surface-700 dark:text-surface-300">Voice Input</span>
+                <span class="text-sm font-medium text-surface-700 dark:text-surface-300">{{ t('ui.entry.voice_input') }}</span>
                 <button type="button" id="voice-record-btn"
                         class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 transition"
                         onclick="voiceToggleRecording()">
@@ -139,7 +139,7 @@
                         </svg>
                     </span>
                     <span id="voice-recording-dot" class="hidden recording-dot"></span>
-                    <span id="voice-record-label">Record</span>
+                    <span id="voice-record-label">{{ t('ui.entry.voice.record') }}</span>
                     <span id="voice-record-timer" class="hidden font-mono text-xs"></span>
                 </button>
             </div>
@@ -149,7 +149,7 @@
                 <canvas id="voice-waveform" class="voice-waveform"></canvas>
                 <div class="flex items-center gap-2 text-sm text-surface-600 dark:text-surface-400">
                     <span class="recording-dot"></span>
-                    <span>Recording: <span id="voice-timer">0:00</span></span>
+                    <span>{{ t('ui.entry.voice.recording') }} <span id="voice-timer">0:00</span></span>
                 </div>
             </div>
 
@@ -158,7 +158,7 @@
                 <div class="progress-bar-track bg-surface-200 dark:bg-surface-700">
                     <div class="progress-bar-fill bg-primary-500"></div>
                 </div>
-                <p class="text-sm text-surface-600 dark:text-surface-400">Transcribing...</p>
+                <p class="text-sm text-surface-600 dark:text-surface-400">{{ t('ui.entry.voice.transcribing') }}</p>
             </div>
 
             <!-- Preview state: editable text + actions -->
@@ -168,21 +168,21 @@
                               class="w-full rounded-md border border-surface-300 dark:border-surface-600 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none resize-y"></textarea>
                     <div class="flex items-center justify-between flex-wrap gap-2">
                         <div class="flex items-center gap-3 text-xs text-surface-500 dark:text-surface-400">
-                            <span>Detected: <strong id="voice-detected-lang">—</strong></span>
-                            <span>Confidence: <strong id="voice-confidence">—</strong></span>
+                            <span>{{ t('ui.entry.voice.detected') }} <strong id="voice-detected-lang">—</strong></span>
+                            <span>{{ t('ui.entry.voice.confidence') }} <strong id="voice-confidence">—</strong></span>
                         </div>
                         <div class="flex items-center gap-2">
                             <button type="button" onclick="voiceInsertAtCursor()"
                                     class="px-3 py-1 rounded text-xs font-medium bg-primary-600 text-white hover:bg-primary-700 transition">
-                                Insert at Cursor
+                                {{ t('ui.entry.voice.insert_at_cursor') }}
                             </button>
                             <button type="button" onclick="voiceReplaceAll()"
                                     class="px-3 py-1 rounded text-xs font-medium bg-surface-200 dark:bg-surface-600 text-surface-700 dark:text-surface-200 hover:bg-surface-300 dark:hover:bg-surface-500 transition">
-                                Replace All
+                                {{ t('ui.entry.voice.replace_all') }}
                             </button>
                             <button type="button" onclick="voiceDismissPreview()"
                                     class="p-1 rounded text-surface-400 hover:text-surface-600 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-700 transition"
-                                    title="Dismiss">
+                                    title="{{ t('ui.entry.voice.dismiss') }}">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                                 </svg>
@@ -203,7 +203,7 @@
                         <p id="voice-error-message" class="text-sm text-red-700 dark:text-red-300"></p>
                         <button type="button" onclick="voiceRetry()"
                                 class="mt-2 text-xs font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 underline">
-                            Try Again
+                            {{ t('ui.entry.voice.try_again') }}
                         </button>
                     </div>
                 </div>
@@ -215,16 +215,17 @@
             <!-- Panel header -->
             <div class="flex items-center justify-between px-4 py-3 border-b border-surface-100 dark:border-surface-700">
                 <div class="flex items-center gap-2">
-                    <span class="text-sm font-medium text-surface-700 dark:text-surface-300">Go Deeper</span>
+                    <span class="text-sm font-medium text-surface-700 dark:text-surface-300">{{ t('ui.entry.deeper.title') }}</span>
                 </div>
                 <button type="button" id="deeper-generate-btn"
+                        data-prompt-key="generate_deeper_questions"
                         class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 transition"
                         onclick="deeperGenerate(true)">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                               d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
-                    <span>Generate Question</span>
+                    <span>{{ t('ui.entry.deeper.generate_question') }}</span>
                 </button>
             </div>
 
@@ -233,7 +234,7 @@
                 <div class="progress-bar-track bg-surface-200 dark:bg-surface-700">
                     <div class="progress-bar-fill bg-primary-500"></div>
                 </div>
-                <p class="text-sm text-surface-600 dark:text-surface-400">Generating a reflective question...</p>
+                <p class="text-sm text-surface-600 dark:text-surface-400">{{ t('ui.entry.deeper.generating') }}</p>
             </div>
 
             <!-- Questions state -->
@@ -243,10 +244,10 @@
                         <!-- Questions will be inserted here -->
                     </div>
                     <div class="flex items-center justify-between pt-2 border-t border-surface-100 dark:border-surface-700">
-                        <p class="text-xs text-surface-500 dark:text-surface-400">Click the question to insert it into your entry</p>
+                        <p class="text-xs text-surface-500 dark:text-surface-400">{{ t('ui.entry.deeper.click_to_insert') }}</p>
                         <button type="button" onclick="deeperNewQuestion()"
                                 class="text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300">
-                            New Question
+                            {{ t('ui.entry.deeper.new_question') }}
                         </button>
                     </div>
                 </div>
@@ -263,7 +264,7 @@
                         <p id="deeper-error-message" class="text-sm text-red-700 dark:text-red-300"></p>
                         <button type="button" onclick="deeperGenerate(true)"
                                 class="mt-2 text-xs font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 underline">
-                            Try Again
+                            {{ t('ui.entry.voice.try_again') }}
                         </button>
                     </div>
                 </div>
@@ -271,7 +272,7 @@
 
             <!-- Empty/hint state -->
             <div id="deeper-empty-state" class="px-4 py-3">
-                <p class="text-sm text-surface-500 dark:text-surface-400">Write some content above, then click "Generate Question" to get an AI-powered prompt that helps you explore your thoughts more deeply.</p>
+                <p class="text-sm text-surface-500 dark:text-surface-400">{{ t('ui.entry.deeper.empty_hint') }}</p>
             </div>
         </div>
 
@@ -289,18 +290,18 @@
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        Analysiere...
+                        {{ t('ui.entry.tags.analyzing') }}
                     </span>
-                    <button type="button" id="suggest-tags-btn" onclick="TagSuggester.refreshSuggestions()"
+                    <button type="button" id="suggest-tags-btn" data-prompt-key="suggest_tags" onclick="TagSuggester.refreshSuggestions()"
                             class="text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition">
-                        Tags vorschlagen
+                        {{ t('ui.entry.tags.suggest') }}
                     </button>
                 </div>
             </div>
 
             <!-- Baustellen Connections -->
             <div id="baustellen-connections-panel" class="hidden border-b border-surface-100 dark:border-surface-700 px-4 py-2 bg-amber-50/50 dark:bg-amber-900/10">
-                <p class="text-xs text-amber-700 dark:text-amber-400 font-medium mb-1">Verbindet zu deinen Baustellen:</p>
+                <p class="text-xs text-amber-700 dark:text-amber-400 font-medium mb-1">{{ t('ui.entry.tags.connected_concerns') }}</p>
                 <div id="baustellen-connections-list" class="flex flex-wrap gap-1">
                     <!-- Baustellen badges will render here -->
                 </div>
@@ -315,7 +316,7 @@
                 <!-- Tag Input -->
                 <div class="flex gap-2">
                     <input type="text" id="tag-input"
-                           placeholder="Tag hinzufügen (Enter drücken)"
+                           placeholder="{{ t('ui.entry.tags.input_placeholder') }}"
                            class="flex-1 rounded-lg border border-surface-300 dark:border-surface-600 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                            onkeydown="TagSuggester.handleInputKeydown(event)">
                     <input type="hidden" id="tags" name="tags" value="{{ entry.tags | join(', ') if editing and entry and entry.tags else '' }}">
@@ -336,8 +337,8 @@
                         <svg class="w-3.5 h-3.5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/>
                         </svg>
-                        <p class="text-xs font-medium text-surface-700 dark:text-surface-300">Aus deinen bestehenden Tags</p>
-                        <span class="text-[10px] text-surface-400">(Bekannte Kategorien)</span>
+                        <p class="text-xs font-medium text-surface-700 dark:text-surface-300">{{ t('ui.entry.tags.from_existing') }}</p>
+                        <span class="text-[10px] text-surface-400">{{ t('ui.entry.tags.known_categories') }}</span>
                     </div>
                     <div id="tag-suggestions-existing" class="flex flex-wrap gap-2">
                         <!-- Existing tag suggestions will render here -->
@@ -350,8 +351,8 @@
                         <svg class="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
                         </svg>
-                        <p class="text-xs font-medium text-blue-700 dark:text-blue-400">Neue Ideen</p>
-                        <span class="text-[10px] text-blue-500">(Erweitert dein System)</span>
+                        <p class="text-xs font-medium text-blue-700 dark:text-blue-400">{{ t('ui.entry.tags.new_ideas') }}</p>
+                        <span class="text-[10px] text-blue-500">{{ t('ui.entry.tags.expand_system') }}</span>
                     </div>
                     <div id="tag-suggestions-new" class="flex flex-wrap gap-2">
                         <!-- New tag suggestions will render here -->
@@ -367,17 +368,17 @@
         <div class="flex gap-3">
             {% if editing %}
             <button type="submit" class="bg-primary-600 text-white font-semibold px-6 py-2.5 rounded-lg hover:bg-primary-700 transition">
-                Save Changes
+                {{ t('ui.entry.save_changes') }}
             </button>
             {% else %}
-            <button type="button" id="finish-entry-btn" onclick="finishEntry()" class="bg-primary-600 text-white font-semibold px-6 py-2.5 rounded-lg hover:bg-primary-700 transition">
-                Finish Entry
+            <button type="button" id="finish-entry-btn" data-prompt-key="suggest_title,entry_metadata" onclick="finishEntry()" class="bg-primary-600 text-white font-semibold px-6 py-2.5 rounded-lg hover:bg-primary-700 transition">
+                {{ t('ui.entry.finish_entry') }}
             </button>
             <button type="submit" class="bg-surface-200 dark:bg-surface-600 text-surface-700 dark:text-surface-200 font-medium px-6 py-2.5 rounded-lg hover:bg-surface-300 dark:hover:bg-surface-500 transition">
-                Save Without Analysis
+                {{ t('ui.entry.save_without_analysis') }}
             </button>
             {% endif %}
-            <a href="{% if editing %}/entry/{{ entry.id }}{% else %}/{% endif %}" class="bg-surface-100 dark:bg-surface-700 text-surface-700 dark:text-surface-300 font-medium px-6 py-2.5 rounded-lg hover:bg-surface-200 dark:hover:bg-surface-600 transition">Cancel</a>
+            <a href="{% if editing %}/entry/{{ entry.id }}{% else %}/{% endif %}" class="bg-surface-100 dark:bg-surface-700 text-surface-700 dark:text-surface-300 font-medium px-6 py-2.5 rounded-lg hover:bg-surface-200 dark:hover:bg-surface-600 transition">{{ t('ui.entry.cancel') }}</a>
         </div>
             </form>
         </div>
@@ -385,12 +386,12 @@
         <aside class="mt-8 lg:mt-0 lg:sticky lg:top-6 self-start" aria-live="polite">
             <div class="bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-2xl p-5">
                 <div class="flex items-center justify-between mb-3">
-                    <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">Past Memories</h2>
-                    <span class="text-[10px] uppercase tracking-wider text-surface-400">Auto</span>
+                    <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">{{ t('ui.entry.past_memories.title') }}</h2>
+                    <span class="text-[10px] uppercase tracking-wider text-surface-400">{{ t('ui.entry.past_memories.auto') }}</span>
                 </div>
-                <p class="text-xs text-surface-500 dark:text-surface-400 mb-4">As you write, we will surface entries that feel related.</p>
+                <p class="text-xs text-surface-500 dark:text-surface-400 mb-4">{{ t('ui.entry.past_memories.description') }}</p>
                 <div id="memory-empty" class="text-xs text-surface-400 bg-surface-50 dark:bg-surface-700/40 rounded-lg p-3">
-                    No similar memories yet. Keep writing to see connections.
+                    {{ t('ui.entry.past_memories.empty') }}
                 </div>
                 <div id="memory-list" class="space-y-3 hidden"></div>
             </div>
@@ -467,7 +468,7 @@
             <!-- Action buttons -->
             <div id="analysis-actions" class="flex gap-3 justify-end">
                 <button type="button" id="analysis-cancel-btn" onclick="cancelAnalysis()" class="px-4 py-2 text-sm font-medium text-surface-600 dark:text-surface-400 hover:text-surface-800 dark:hover:text-surface-200 transition">
-                    Cancel
+                    {{ t('ui.entry.cancel') }}
                 </button>
             </div>
         </div>
@@ -498,6 +499,17 @@
 
 {% block scripts %}
 <script>
+    const i18nEntry = {
+        tagNoneAvailable: {{ t('ui.entry.tags.none_available') | tojson }},
+        tagLoadFailed: {{ t('ui.entry.tags.load_failed') | tojson }},
+        tagMinChars: {{ t('ui.entry.tags.min_chars') | tojson }},
+        tagNoKnownMatches: {{ t('ui.entry.tags.no_known_matches') | tojson }},
+        tagNewBadge: {{ t('ui.entry.tags.new_badge') | tojson }},
+        tagNoNewIdeas: {{ t('ui.entry.tags.no_new_ideas') | tojson }},
+        tagEmptyHint: {{ t('ui.entry.tags.empty_hint') | tojson }},
+        cancel: {{ t('ui.entry.cancel') | tojson }}
+    };
+
     // ── Word count ──────────────────────────────────────────────────────
     const textarea = document.getElementById('content');
     const wordCount = document.getElementById('word-count');
@@ -513,6 +525,12 @@
     updateWordCount();
 
     // ── Shared Utility ─────────────────────────────────────────────────
+    function displayTag(tag) {
+        // Strip category prefix (e.g. "person:me" → "me", "topic:schlaf" → "schlaf")
+        const idx = tag.indexOf(':');
+        return idx !== -1 ? tag.slice(idx + 1) : tag;
+    }
+
     function escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
@@ -1100,10 +1118,10 @@
         analysisProgressBar.style.width = '0%';
         analysisProgressText.textContent = 'Starting analysis...';
         analysisError.classList.add('hidden');
-        analysisCancelBtn.textContent = 'Cancel';
+        analysisCancelBtn.textContent = i18nEntry.cancel;
         analysisActions.innerHTML = `
             <button type="button" id="analysis-cancel-btn" onclick="cancelAnalysis()" class="px-4 py-2 text-sm font-medium text-surface-600 dark:text-surface-400 hover:text-surface-800 dark:hover:text-surface-200 transition">
-                Cancel
+                ${i18nEntry.cancel}
             </button>
         `;
     }
@@ -1423,8 +1441,8 @@
                     body: JSON.stringify({
                         content: content,
                         existing_tags: this.tags,
-                        max_existing: 5,
-                        max_new: 2
+                        max_existing: 7,
+                        max_new: 6
                     })
                 });
 
@@ -1459,14 +1477,14 @@
 
                 if (!hasExisting && !hasNew) {
                     console.log('No suggestions returned from API');
-                    this.showMessage('Keine Tag-Vorschläge verfügbar. Überprüfe, ob Ollama läuft.', 'warning');
+                    this.showMessage(i18nEntry.tagNoneAvailable, 'warning');
                 }
 
                 this.renderSmartSuggestions(data);
                 this.renderBaustellenConnections(data.baustellen_matches || []);
             } catch (err) {
                 console.error('Tag suggestion error:', err);
-                this.showMessage('Tag-Vorschläge konnten nicht geladen werden', 'error');
+                this.showMessage(i18nEntry.tagLoadFailed, 'error');
             } finally {
                 this.isLoading = false;
                 this.hideSpinner();
@@ -1479,7 +1497,7 @@
                 this.lastContent = ''; // Force refresh
                 this.fetchSuggestions(content);
             } else {
-                this.showMessage('Schreibe mindestens 50 Zeichen für Tag-Vorschläge', 'warning');
+                this.showMessage(i18nEntry.tagMinChars, 'warning');
             }
         },
 
@@ -1503,12 +1521,12 @@
                             title="${escapeHtml(s.reason)}"
                             class="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium bg-surface-200 dark:bg-surface-600 text-surface-700 dark:text-surface-200 hover:bg-primary-100 dark:hover:bg-primary-900/30 hover:text-primary-700 dark:hover:text-primary-300 transition border border-transparent hover:border-primary-300 dark:hover:border-primary-600">
                         <span class="w-1.5 h-1.5 rounded-full bg-primary-400"></span>
-                        ${escapeHtml(s.tag)}
+                        ${escapeHtml(displayTag(s.tag))}
                         <span class="text-[10px] opacity-60 group-hover:opacity-100">${Math.round(s.score * 100)}%</span>
                     </button>
                 `).join('');
             } else {
-                existingList.innerHTML = '<span class="text-xs text-surface-400 italic">Keine passenden bekannten Tags gefunden</span>';
+                existingList.innerHTML = `<span class="text-xs text-surface-400 italic">${i18nEntry.tagNoKnownMatches}</span>`;
             }
 
             // Render new tag suggestions
@@ -1520,12 +1538,12 @@
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
                         </svg>
-                        ${escapeHtml(s.tag)}
-                        <span class="text-[10px] opacity-60">Neu</span>
+                        ${escapeHtml(displayTag(s.tag))}
+                        <span class="text-[10px] opacity-60">${i18nEntry.tagNewBadge}</span>
                     </button>
                 `).join('');
             } else {
-                newList.innerHTML = '<span class="text-xs text-surface-400 italic">Keine neuen Tag-Ideen</span>';
+                newList.innerHTML = `<span class="text-xs text-surface-400 italic">${i18nEntry.tagNoNewIdeas}</span>`;
             }
 
             panel.classList.remove('hidden');
@@ -1575,12 +1593,12 @@
             if (!container) return;
 
             if (this.tags.length === 0) {
-                container.innerHTML = '<span class="text-sm text-surface-400 italic">Noch keine Tags. Füge Tags hinzu, um Einträge zu verknüpfen und Baustellen zu identifizieren.</span>';
+                container.innerHTML = `<span class="text-sm text-surface-400 italic">${i18nEntry.tagEmptyHint}</span>`;
             } else {
                 container.innerHTML = this.tags.map(tag => `
                     <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-sm font-medium bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-700">
-                        ${escapeHtml(tag)}
-                        <button type="button" onclick="TagSuggester.removeTag('${escapeHtml(tag)}')" 
+                        ${escapeHtml(displayTag(tag))}
+                        <button type="button" onclick="TagSuggester.removeTag('${escapeHtml(tag)}')"
                                 class="hover:text-primary-900 dark:hover:text-primary-100 focus:outline-none"
                                 aria-label="Remove tag ${escapeHtml(tag)}">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

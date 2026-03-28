@@ -1,14 +1,14 @@
 {% extends "base.html" %}
-{% block title %}System Status{% endblock %}
+{% block title %}{{ t('ui.status.title') }}{% endblock %}
 
 {% block content %}
 <div class="max-w-4xl mx-auto space-y-8">
     <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
-            <h1 class="text-2xl font-bold text-surface-900 dark:text-white">System Status</h1>
+            <h1 class="text-2xl font-bold text-surface-900 dark:text-white">{{ t('ui.status.title') }}</h1>
             <p class="text-sm text-surface-500 dark:text-surface-400">
-                Monitor all services and system health.
-                <span id="last-updated" class="ml-2 text-xs">Last updated: {{ diagnostics.timestamp }}</span>
+                {{ t('ui.status.subtitle') }}
+                <span id="last-updated" class="ml-2 text-xs">{{ t('ui.status.last_updated') }} {{ diagnostics.timestamp }}</span>
             </p>
         </div>
         <button onclick="refreshStatus()" id="refresh-btn"
@@ -16,20 +16,20 @@
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
             </svg>
-            <span>Refresh All</span>
+            <span>{{ t('ui.status.refresh_all') }}</span>
         </button>
     </div>
 
     <!-- Overall Health Summary -->
     <div class="bg-white dark:bg-surface-800 rounded-2xl border border-surface-200 dark:border-surface-700 p-6">
-        <h2 class="text-lg font-semibold text-surface-900 dark:text-white mb-4">Health Summary</h2>
+        <h2 class="text-lg font-semibold text-surface-900 dark:text-white mb-4">{{ t('ui.status.health_summary') }}</h2>
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {% set services_list = diagnostics.services.values() | list %}
             {% set available_count = services_list | selectattr('available') | list | length %}
             {% set total_count = services_list | length %}
 
             <div class="bg-surface-50 dark:bg-surface-900/30 rounded-xl p-4 border border-surface-200 dark:border-surface-700">
-                <p class="text-xs text-surface-400 mb-1">Services Online</p>
+                <p class="text-xs text-surface-400 mb-1">{{ t('ui.status.services_online') }}</p>
                 <p class="text-2xl font-bold {% if available_count == total_count %}text-green-600{% elif available_count > 0 %}text-amber-600{% else %}text-red-600{% endif %}">
                     {{ available_count }}/{{ total_count }}
                 </p>
@@ -37,7 +37,7 @@
 
             {% if diagnostics.system.memory_percent_used is defined %}
             <div class="bg-surface-50 dark:bg-surface-900/30 rounded-xl p-4 border border-surface-200 dark:border-surface-700">
-                <p class="text-xs text-surface-400 mb-1">Memory Usage</p>
+                <p class="text-xs text-surface-400 mb-1">{{ t('ui.status.memory_usage') }}</p>
                 <p class="text-2xl font-bold {% if diagnostics.system.memory_percent_used < 70 %}text-green-600{% elif diagnostics.system.memory_percent_used < 90 %}text-amber-600{% else %}text-red-600{% endif %}">
                     {{ diagnostics.system.memory_percent_used }}%
                 </p>
@@ -45,12 +45,12 @@
             {% endif %}
 
             <div class="bg-surface-50 dark:bg-surface-900/30 rounded-xl p-4 border border-surface-200 dark:border-surface-700">
-                <p class="text-xs text-surface-400 mb-1">Platform</p>
+                <p class="text-xs text-surface-400 mb-1">{{ t('ui.status.platform') }}</p>
                 <p class="text-lg font-semibold text-surface-700 dark:text-surface-200">{{ diagnostics.system.platform }}</p>
             </div>
 
             <div class="bg-surface-50 dark:bg-surface-900/30 rounded-xl p-4 border border-surface-200 dark:border-surface-700">
-                <p class="text-xs text-surface-400 mb-1">Python</p>
+                <p class="text-xs text-surface-400 mb-1">{{ t('ui.status.python') }}</p>
                 <p class="text-lg font-semibold text-surface-700 dark:text-surface-200">{{ diagnostics.system.python_version }}</p>
             </div>
         </div>
@@ -71,14 +71,14 @@
                         </div>
                     </div>
                     <span class="shrink-0 px-2.5 py-1 text-xs font-medium rounded-full {% if svc.available %}bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400{% else %}bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400{% endif %}">
-                        {% if svc.available %}Online{% else %}Offline{% endif %}
+                        {% if svc.available %}{{ t('ui.status.online') }}{% else %}{{ t('ui.status.offline') }}{% endif %}
                     </span>
                 </div>
 
                 <!-- Configuration -->
                 {% if svc.config %}
                 <div class="mt-4 p-3 bg-surface-50 dark:bg-surface-900/30 rounded-lg">
-                    <p class="text-xs font-medium text-surface-500 dark:text-surface-400 mb-2">Configuration</p>
+                    <p class="text-xs font-medium text-surface-500 dark:text-surface-400 mb-2">{{ t('ui.status.configuration') }}</p>
                     <div class="grid gap-2 text-sm">
                         {% for k, v in svc.config.items() %}
                         <div class="flex justify-between gap-4">
@@ -94,7 +94,7 @@
                 {% if svc.details %}
                 <div class="mt-4">
                     <button onclick="toggleDetails('{{ key }}')" class="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1">
-                        <span>Show Details</span>
+                        <span>{{ t('ui.status.show_details') }}</span>
                         <svg class="w-3 h-3 transition-transform" id="arrow-{{ key }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                         </svg>
@@ -121,7 +121,7 @@
                 <!-- Setup Instructions (if service is unavailable) -->
                 {% if svc.setup_instructions and not svc.available %}
                 <div class="mt-4 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-                    <p class="text-sm font-medium text-amber-800 dark:text-amber-200 mb-2">Setup Instructions</p>
+                    <p class="text-sm font-medium text-amber-800 dark:text-amber-200 mb-2">{{ t('ui.status.setup_instructions') }}</p>
                     <pre class="text-xs text-amber-700 dark:text-amber-300 whitespace-pre-wrap font-mono">{{ svc.setup_instructions }}</pre>
                 </div>
                 {% endif %}
@@ -132,65 +132,81 @@
 
     <!-- Troubleshooting Guide -->
     <div class="bg-white dark:bg-surface-800 rounded-2xl border border-surface-200 dark:border-surface-700 p-6">
-        <h2 class="text-lg font-semibold text-surface-900 dark:text-white mb-4">Troubleshooting Guide</h2>
+        <h2 class="text-lg font-semibold text-surface-900 dark:text-white mb-4">{{ t('ui.status.troubleshooting_guide') }}</h2>
         <div class="space-y-4">
             <details class="group">
                 <summary class="flex items-center justify-between cursor-pointer text-sm font-medium text-surface-700 dark:text-surface-300 py-2">
-                    <span>AI Analysis Not Working</span>
+                    <span>{{ t('ui.status.ai_not_working') }}</span>
                     <svg class="w-4 h-4 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                     </svg>
                 </summary>
-                <div class="pt-2 pb-4 text-sm text-surface-500 dark:text-surface-400 space-y-2">
-                    <p>1. Ensure Ollama is running: <code class="bg-surface-100 dark:bg-surface-700 px-1 rounded">ollama serve</code></p>
-                    <p>2. Pull a model: <code class="bg-surface-100 dark:bg-surface-700 px-1 rounded">ollama pull llama3.2</code></p>
-                    <p>3. Check the endpoint matches your .env: <code class="bg-surface-100 dark:bg-surface-700 px-1 rounded">OLLAMA_BASE_URL</code></p>
-                    <p>4. If analysis is slow, try a smaller model or increase <code class="bg-surface-100 dark:bg-surface-700 px-1 rounded">OLLAMA_TIMEOUT</code></p>
+                <div class="pt-2 pb-4 text-sm text-surface-500 dark:text-surface-400 space-y-3">
+                    <div>
+                        <p class="font-semibold text-surface-700 dark:text-surface-200 mb-2">{{ t('ui.status.using_ollama') }}</p>
+                        <div class="space-y-2 pl-2">
+                            <p>1. {{ t('ui.status.troubleshooting.ollama.step1') }} <code class="bg-surface-100 dark:bg-surface-700 px-1 rounded">ollama serve</code></p>
+                            <p>2. {{ t('ui.status.troubleshooting.ollama.step2') }} <code class="bg-surface-100 dark:bg-surface-700 px-1 rounded">ollama pull llama3.2</code></p>
+                            <p>3. {{ t('ui.status.troubleshooting.ollama.step3') }} <code class="bg-surface-100 dark:bg-surface-700 px-1 rounded">OLLAMA_BASE_URL</code></p>
+                            <p>4. {{ t('ui.status.troubleshooting.ollama.step4') }} <code class="bg-surface-100 dark:bg-surface-700 px-1 rounded">OLLAMA_TIMEOUT</code></p>
+                        </div>
+                    </div>
+                    <div class="border-t border-surface-200 dark:border-surface-600 pt-3">
+                        <p class="font-semibold text-surface-700 dark:text-surface-200 mb-2">{{ t('ui.status.using_lmstudio') }}</p>
+                        <div class="space-y-2 pl-2">
+                            <p>1. {{ t('ui.status.troubleshooting.lmstudio.step1') }}</p>
+                            <p>2. {{ t('ui.status.troubleshooting.lmstudio.step2') }}</p>
+                            <p>3. {{ t('ui.status.troubleshooting.lmstudio.step3') }} <code class="bg-surface-100 dark:bg-surface-700 px-1 rounded">LMSTUDIO_BASE_URL</code> (default: http://127.0.0.1:1234/v1)</p>
+                            <p>4. {{ t('ui.status.troubleshooting.lmstudio.step4') }} <code class="bg-surface-100 dark:bg-surface-700 px-1 rounded">LLM_PROVIDER=lmstudio</code> {{ t('ui.status.troubleshooting.lmstudio.step4_suffix') }}</p>
+                            <p>5. {{ t('ui.status.troubleshooting.lmstudio.step5') }} <code class="bg-surface-100 dark:bg-surface-700 px-1 rounded">LMSTUDIO_MODEL</code> {{ t('ui.status.troubleshooting.lmstudio.step5_suffix') }}</p>
+                            <p>6. {{ t('ui.status.troubleshooting.lmstudio.step6') }} <code class="bg-surface-100 dark:bg-surface-700 px-1 rounded">--lmstudio</code> {{ t('ui.status.troubleshooting.lmstudio.step6_suffix') }}</p>
+                        </div>
+                    </div>
                 </div>
             </details>
 
             <details class="group">
                 <summary class="flex items-center justify-between cursor-pointer text-sm font-medium text-surface-700 dark:text-surface-300 py-2">
-                    <span>Voice Transcription Not Working</span>
+                    <span>{{ t('ui.status.voice_not_working') }}</span>
                     <svg class="w-4 h-4 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                     </svg>
                 </summary>
                 <div class="pt-2 pb-4 text-sm text-surface-500 dark:text-surface-400 space-y-2">
-                    <p>1. Install Whisper: <code class="bg-surface-100 dark:bg-surface-700 px-1 rounded">pip install openai-whisper</code></p>
-                    <p>2. Install ffmpeg (required for audio processing)</p>
-                    <p>3. Grant microphone permissions in your browser</p>
-                    <p>4. For better accuracy, use a larger model in Settings</p>
+                    <p>1. {{ t('ui.status.troubleshooting.voice.step1') }} <code class="bg-surface-100 dark:bg-surface-700 px-1 rounded">pip install openai-whisper</code></p>
+                    <p>2. {{ t('ui.status.troubleshooting.voice.step2') }}</p>
+                    <p>3. {{ t('ui.status.troubleshooting.voice.step3') }}</p>
+                    <p>4. {{ t('ui.status.troubleshooting.voice.step4') }}</p>
                 </div>
             </details>
 
             <details class="group">
                 <summary class="flex items-center justify-between cursor-pointer text-sm font-medium text-surface-700 dark:text-surface-300 py-2">
-                    <span>Semantic Search Not Finding Results</span>
+                    <span>{{ t('ui.status.semantic_search_not_working') }}</span>
                     <svg class="w-4 h-4 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                     </svg>
                 </summary>
                 <div class="pt-2 pb-4 text-sm text-surface-500 dark:text-surface-400 space-y-2">
-                    <p>1. Ensure ChromaDB is operational (check above)</p>
-                    <p>2. Entries need to be indexed - older entries may need re-indexing</p>
-                    <p>3. Try keyword search as a fallback</p>
-                    <p>4. If ChromaDB is corrupted, delete the folder and restart</p>
+                    <p>1. {{ t('ui.status.troubleshooting.semantic.step1') }}</p>
+                    <p>2. {{ t('ui.status.troubleshooting.semantic.step2') }}</p>
+                    <p>3. {{ t('ui.status.troubleshooting.semantic.step3') }}</p>
+                    <p>4. {{ t('ui.status.troubleshooting.semantic.step4') }}</p>
                 </div>
             </details>
 
             <details class="group">
                 <summary class="flex items-center justify-between cursor-pointer text-sm font-medium text-surface-700 dark:text-surface-300 py-2">
-                    <span>Database Errors or Corruption</span>
+                    <span>{{ t('ui.status.database_errors') }}</span>
                     <svg class="w-4 h-4 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                     </svg>
                 </summary>
                 <div class="pt-2 pb-4 text-sm text-surface-500 dark:text-surface-400 space-y-2">
-                    <p>1. Export your data first (Settings > Export)</p>
-                    <p>2. Try running: <code class="bg-surface-100 dark:bg-surface-700 px-1 rounded">sqlite3 journal.db "PRAGMA integrity_check"</code></p>
-                    <p>3. If corrupted, restore from backup or delete and re-import</p>
-                    <p>4. Enable WAL mode for better durability (default in this app)</p>
+                    <p>1. {{ t('ui.status.troubleshooting.database.step1') }}</p>
+                    <p>2. {{ t('ui.status.troubleshooting.database.step2') }} <code class="bg-surface-100 dark:bg-surface-700 px-1 rounded">sqlite3 journal.db "PRAGMA integrity_check"</code></p>
+                    <p>3. {{ t('ui.status.troubleshooting.database.step3') }}</p>
+                    <p>4. {{ t('ui.status.troubleshooting.database.step4') }}</p>
                 </div>
             </details>
         </div>
@@ -198,26 +214,26 @@
 
     <!-- Quick Actions -->
     <div class="bg-white dark:bg-surface-800 rounded-2xl border border-surface-200 dark:border-surface-700 p-6">
-        <h2 class="text-lg font-semibold text-surface-900 dark:text-white mb-4">Quick Actions</h2>
+        <h2 class="text-lg font-semibold text-surface-900 dark:text-white mb-4">{{ t('ui.status.quick_actions') }}</h2>
         <div class="flex flex-wrap gap-3">
             <a href="/settings" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-surface-700 dark:text-surface-300 bg-surface-100 dark:bg-surface-700 rounded-lg hover:bg-surface-200 dark:hover:bg-surface-600 transition">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                 </svg>
-                Open Settings
+                {{ t('ui.status.open_settings') }}
             </a>
             <button onclick="downloadDiagnostics()" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-surface-700 dark:text-surface-300 bg-surface-100 dark:bg-surface-700 rounded-lg hover:bg-surface-200 dark:hover:bg-surface-600 transition">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                 </svg>
-                Download Diagnostics
+                {{ t('ui.status.download_diagnostics') }}
             </button>
             <button onclick="testAllServices()" id="test-all-btn" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
-                Test All Services
+                {{ t('ui.status.test_all_services') }}
             </button>
         </div>
     </div>
@@ -226,6 +242,20 @@
 
 {% block scripts %}
 <script>
+    // Translation strings for JavaScript
+    const i18n = {
+        refreshing: {{ t('ui.status.refreshing') | tojson }},
+        refreshAll: {{ t('ui.status.refresh_all') | tojson }},
+        testing: {{ t('ui.status.testing') | tojson }},
+        testAllServices: {{ t('ui.status.test_all_services') | tojson }},
+        failedRefresh: {{ t('ui.status.failed_refresh') | tojson }},
+        networkError: {{ t('ui.status.network_error') | tojson }},
+        testResults: {{ t('ui.status.test_results') | tojson }},
+        pass: {{ t('ui.status.pass') | tojson }},
+        fail: {{ t('ui.status.fail') | tojson }},
+        errorRunningTests: {{ t('ui.status.error_running_tests') | tojson }}
+    };
+
     function toggleDetails(serviceKey) {
         const details = document.getElementById(`details-${serviceKey}`);
         const arrow = document.getElementById(`arrow-${serviceKey}`);
@@ -236,45 +266,45 @@
     async function refreshStatus() {
         const btn = document.getElementById('refresh-btn');
         btn.disabled = true;
-        btn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span>Refreshing...</span>';
+        btn.innerHTML = `<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span>${i18n.refreshing}</span>`;
 
         try {
             const resp = await fetch('/api/status', { method: 'GET' });
             if (resp.ok) {
                 window.location.reload();
             } else {
-                alert('Failed to refresh status');
+                alert(i18n.failedRefresh);
             }
         } catch (e) {
-            alert('Network error while refreshing');
+            alert(i18n.networkError);
         }
 
         btn.disabled = false;
-        btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg><span>Refresh All</span>';
+        btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg><span>${i18n.refreshAll}</span>`;
     }
 
     async function testAllServices() {
         const btn = document.getElementById('test-all-btn');
         btn.disabled = true;
-        btn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span>Testing...</span>';
+        btn.innerHTML = `<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span>${i18n.testing}</span>`;
 
         try {
             const resp = await fetch('/api/services/test', { method: 'POST' });
             const data = await resp.json();
 
-            let message = 'Test Results:\n\n';
+            let message = i18n.testResults + '\n\n';
             for (const [service, result] of Object.entries(data.results || {})) {
-                const status = result.success ? 'PASS' : 'FAIL';
+                const status = result.success ? i18n.pass : i18n.fail;
                 message += `${service}: ${status}\n`;
                 if (result.message) message += `  ${result.message}\n`;
             }
             alert(message);
         } catch (e) {
-            alert('Error running tests: ' + e.message);
+            alert(i18n.errorRunningTests + ' ' + e.message);
         }
 
         btn.disabled = false;
-        btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg><span>Test All Services</span>';
+        btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg><span>${i18n.testAllServices}</span>`;
     }
 
     function downloadDiagnostics() {

@@ -194,11 +194,13 @@ Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "   http://localhost:5000" -ForegroundColor Green
 Write-Host "   Press Ctrl+C to stop" -ForegroundColor DarkGray
+Write-Host ""
+Write-Host "   Tip: Use --ollama or --lmstudio to override LLM provider" -ForegroundColor DarkGray
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
 # Open browser
 Start-Job -ScriptBlock { Start-Sleep 2; Start-Process "http://localhost:5000" } | Out-Null
 
-# Run Flask
-python app/app.py
+# Run Flask (pass through any command-line arguments)
+python app/app.py $args

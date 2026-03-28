@@ -12,3 +12,8 @@ app/static/uploads/
 dist/
 build/
 .claude/
+
+# Personal developer launch scripts
+dev-*-start.*
+my-start.*
+*-local.*

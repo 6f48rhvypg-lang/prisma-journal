@@ -11,17 +11,20 @@ import sys
 import os
 import time
 from datetime import datetime
+from typing import Any
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 import requests
 from config import Config
+from .i18n import translate as _t
 
 # Optional import for system diagnostics
 try:
     import psutil
     HAS_PSUTIL = True
 except ImportError:
+    psutil = None
     HAS_PSUTIL = False
 
 log = logging.getLogger(__name__)
@@ -37,42 +40,79 @@ class ServiceStatus:
     def __init__(self):
         self.ollama: bool = False
         self.ollama_message: str = ""
+        self.ollama_message_i18n: dict = {}
+        self.lmstudio: bool = False
+        self.lmstudio_message: str = ""
+        self.lmstudio_message_i18n: dict = {}
         self.whisper: bool = False
         self.whisper_message: str = ""
+        self.whisper_message_i18n: dict = {}
         self.chromadb: bool = False
         self.chromadb_message: str = ""
+        self.chromadb_message_i18n: dict = {}
         self.embeddings: bool = False
         self.embeddings_message: str = ""
+        self.embeddings_message_i18n: dict = {}
         self.stable_diffusion: bool = False
         self.sd_message: str = ""
+        self.sd_message_i18n: dict = {}
 
-    def summary(self) -> list[dict]:
-        """Return a list of dicts suitable for display in the settings page."""
+    @property
+    def llm_ok(self) -> bool:
+        """True if the active LLM provider is available."""
+        if Config.LLM_PROVIDER == "lmstudio":
+            return self.lmstudio
+        return self.ollama
+
+    @property
+    def llm_message(self) -> str:
+        """Status message for the active LLM provider."""
+        if Config.LLM_PROVIDER == "lmstudio":
+            return self.lmstudio_message
+        return self.ollama_message
+
+    def summary(self, lang: str = "de") -> list[dict]:
+        """Return a list of dicts suitable for display.
+        
+        Args:
+            lang: Language code for service names (default: German)
+        """
+        active_marker = " [ACTIVE]" if Config.LLM_PROVIDER == "ollama" else ""
+        lms_active_marker = " [ACTIVE]" if Config.LLM_PROVIDER == "lmstudio" else ""
+        
+        ollama_name = _t("service.ollama.name", lang) + active_marker
+        lmstudio_name = _t("service.lmstudio.name", lang) + lms_active_marker
+        
         return [
             {
-                "name": "Ollama (LLM)",
+                "name": ollama_name,
                 "available": self.ollama,
-                "message": self.ollama_message,
+                "message": self.ollama_message_i18n.get(lang, self.ollama_message),
             },
             {
-                "name": "Whisper (Voice)",
+                "name": lmstudio_name,
+                "available": self.lmstudio,
+                "message": self.lmstudio_message_i18n.get(lang, self.lmstudio_message),
+            },
+            {
+                "name": _t("service.whisper.name", lang),
                 "available": self.whisper,
-                "message": self.whisper_message,
+                "message": self.whisper_message_i18n.get(lang, self.whisper_message),
             },
             {
-                "name": "ChromaDB (Vector Store)",
+                "name": _t("service.chromadb.name", lang),
                 "available": self.chromadb,
-                "message": self.chromadb_message,
+                "message": self.chromadb_message_i18n.get(lang, self.chromadb_message),
             },
             {
-                "name": "Sentence-Transformers (Embeddings)",
+                "name": _t("service.embeddings.name", lang),
                 "available": self.embeddings,
-                "message": self.embeddings_message,
+                "message": self.embeddings_message_i18n.get(lang, self.embeddings_message),
             },
             {
-                "name": "Stable Diffusion (Images)",
+                "name": _t("service.stable_diffusion.name", lang),
                 "available": self.stable_diffusion,
-                "message": self.sd_message,
+                "message": self.sd_message_i18n.get(lang, self.sd_message),
             },
         ]
 
@@ -86,7 +126,7 @@ status = ServiceStatus()
 # ---------------------------------------------------------------------------
 
 
-def check_ollama() -> tuple[bool, str]:
+def check_ollama(lang: str = "de") -> tuple[bool, str]:
     """Ping the Ollama API.  Returns (ok, message)."""
     url = f"{Config.OLLAMA_BASE_URL}/api/tags"
     try:
@@ -94,38 +134,48 @@ def check_ollama() -> tuple[bool, str]:
         resp.raise_for_status()
         models = [m["name"] for m in resp.json().get("models", [])]
         if not models:
-            return True, (
-                "Ollama is running but has no models pulled. "
-                f"Run: ollama pull {Config.OLLAMA_MODEL}"
-            )
+            return True, _t("service.ollama.no_models", lang, model=Config.OLLAMA_MODEL)
         if not any(Config.OLLAMA_MODEL in m for m in models):
-            return True, (
-                f"Ollama is running but model '{Config.OLLAMA_MODEL}' not found. "
-                f"Available: {', '.join(models[:5])}. "
-                f"Run: ollama pull {Config.OLLAMA_MODEL}"
-            )
-        return True, f"Connected — model '{Config.OLLAMA_MODEL}' available"
+            return True, _t("service.ollama.model_not_found_with_run", lang, 
+                          model=Config.OLLAMA_MODEL, 
+                          available=", ".join(models[:5]))
+        return True, _t("service.ollama.connected_model_available", lang, model=Config.OLLAMA_MODEL)
     except requests.ConnectionError:
-        return False, (
-            f"Cannot connect to Ollama at {Config.OLLAMA_BASE_URL}. "
-            "Install from https://ollama.ai and run: ollama serve"
-        )
+        return False, _t("service.ollama.cannot_connect_url", lang, url=Config.OLLAMA_BASE_URL)
     except requests.Timeout:
-        return False, f"Ollama at {Config.OLLAMA_BASE_URL} timed out."
+        return False, _t("service.ollama.timeout_url", lang, url=Config.OLLAMA_BASE_URL)
     except Exception as e:
-        return False, f"Ollama check failed: {e}"
+        return False, _t("service.ollama.check_failed", lang, error=str(e))
 
 
-def check_whisper() -> tuple[bool, str]:
+def check_lmstudio(lang: str = "de") -> tuple[bool, str]:
+    """Check LM Studio API via OpenAI-compatible endpoint. Returns (ok, message)."""
+    url = f"{Config.LMSTUDIO_BASE_URL}/models"
+    try:
+        resp = requests.get(url, timeout=5)
+        resp.raise_for_status()
+        data = resp.json()
+        models = [m.get("id", "") for m in data.get("data", [])]
+        if not models:
+            return False, _t("service.lmstudio.no_models_loaded_url", lang, url=Config.LMSTUDIO_BASE_URL)
+        # Show available models
+        model_list = ", ".join(models[:3])
+        return True, _t("service.lmstudio.models_available_set", lang, models=model_list)
+    except requests.ConnectionError:
+        return False, _t("service.lmstudio.cannot_connect_url", lang, url=Config.LMSTUDIO_BASE_URL)
+    except requests.Timeout:
+        return False, _t("service.lmstudio.timeout_url", lang, url=Config.LMSTUDIO_BASE_URL)
+    except Exception as e:
+        return False, _t("service.lmstudio.check_failed", lang, error=str(e))
+
+
+def check_whisper(lang: str = "de") -> tuple[bool, str]:
     """Verify that the whisper package is importable."""
     try:
         import whisper  # noqa: F401
-        return True, f"Installed — will use '{Config.WHISPER_MODEL}' model (loaded on first use)"
+        return True, _t("service.whisper.installed", lang, model=Config.WHISPER_MODEL)
     except ImportError:
-        return False, (
-            "openai-whisper is not installed. "
-            "Run: pip install openai-whisper  (also requires ffmpeg)"
-        )
+        return False, _t("service.whisper.not_installed", lang)
 
 
 def load_whisper_model():
@@ -135,7 +185,7 @@ def load_whisper_model():
     return whisper.load_model(Config.WHISPER_MODEL)
 
 
-def check_chromadb() -> tuple[bool, str]:
+def check_chromadb(lang: str = "de") -> tuple[bool, str]:
     """Verify ChromaDB can initialise a persistent client."""
     try:
         import chromadb  # noqa: F401
@@ -145,23 +195,22 @@ def check_chromadb() -> tuple[bool, str]:
             name=Config.CHROMA_COLLECTION,
             metadata={"hnsw:space": "cosine"},
         )
-        return True, f"Connected — collection '{Config.CHROMA_COLLECTION}' at {Config.CHROMA_PATH}"
+        return True, _t("service.chromadb.connected_collection", lang, 
+                       collection=Config.CHROMA_COLLECTION, 
+                       path=Config.CHROMA_PATH)
     except ImportError:
-        return False, "chromadb is not installed. Run: pip install chromadb"
+        return False, _t("service.chromadb.not_installed_pip", lang)
     except Exception as e:
-        return False, f"ChromaDB initialisation failed: {e}"
+        return False, _t("service.chromadb.init_failed", lang, error=str(e))
 
 
-def check_embeddings() -> tuple[bool, str]:
+def check_embeddings(lang: str = "de") -> tuple[bool, str]:
     """Verify sentence-transformers is available (model loaded on demand)."""
     try:
         import sentence_transformers  # noqa: F401
-        return True, f"Installed — model '{Config.EMBEDDING_MODEL}' (downloaded on first use)"
+        return True, _t("service.embeddings.installed_model_first_use", lang, model=Config.EMBEDDING_MODEL)
     except ImportError:
-        return False, (
-            "sentence-transformers is not installed. "
-            "Run: pip install sentence-transformers"
-        )
+        return False, _t("service.embeddings.not_installed_pip", lang)
 
 
 def init_sentence_transformer():
@@ -175,26 +224,23 @@ def init_sentence_transformer():
         return None
 
 
-def check_stable_diffusion() -> tuple[bool, str]:
+def check_stable_diffusion(lang: str = "de") -> tuple[bool, str]:
     """Ping the Stable Diffusion WebUI API if enabled."""
     if not Config.SD_ENABLED:
-        return False, "Disabled in configuration (SD_ENABLED=false)"
+        return False, _t("service.sd.disabled_detail", lang)
     url = f"{Config.SD_API_URL}/sdapi/v1/sd-models"
     try:
         resp = requests.get(url, timeout=5)
         resp.raise_for_status()
         models = resp.json()
         count = len(models) if isinstance(models, list) else 0
-        return True, f"Connected — {count} model(s) available at {Config.SD_API_URL}"
+        return True, _t("service.sd.connected_models_count_url", lang, count=count, url=Config.SD_API_URL)
     except requests.ConnectionError:
-        return False, (
-            f"Cannot connect to Stable Diffusion at {Config.SD_API_URL}. "
-            "Start the WebUI with --api flag."
-        )
+        return False, _t("service.sd.cannot_connect_url", lang, url=Config.SD_API_URL)
     except requests.Timeout:
-        return False, f"Stable Diffusion at {Config.SD_API_URL} timed out."
+        return False, _t("service.sd.timeout_url", lang, url=Config.SD_API_URL)
     except Exception as e:
-        return False, f"Stable Diffusion check failed: {e}"
+        return False, _t("service.sd.check_failed", lang, error=str(e))
     """Check if FLUX model is available via Ollama."""
     if not Config.FLUX_ENABLED:
         return False, "Disabled in configuration (FLUX_ENABLED=false)"
@@ -214,17 +260,52 @@ def init_services() -> ServiceStatus:
     for field, msg in warnings:
         log.warning("Config warning [%s]: %s", field, msg)
 
-    status.ollama, status.ollama_message = check_ollama()
-    status.whisper, status.whisper_message = check_whisper()
-    status.chromadb, status.chromadb_message = check_chromadb()
-    status.embeddings, status.embeddings_message = check_embeddings()
-    status.stable_diffusion, status.sd_message = check_stable_diffusion()
+    # Check services and store messages for both languages
+    status.ollama, msg_en = check_ollama("en")
+    _, msg_de = check_ollama("de")
+    status.ollama_message = msg_en
+    status.ollama_message_i18n = {"en": msg_en, "de": msg_de}
+    
+    status.lmstudio, msg_en = check_lmstudio("en")
+    _, msg_de = check_lmstudio("de")
+    status.lmstudio_message = msg_en
+    status.lmstudio_message_i18n = {"en": msg_en, "de": msg_de}
+    
+    status.whisper, msg_en = check_whisper("en")
+    _, msg_de = check_whisper("de")
+    status.whisper_message = msg_en
+    status.whisper_message_i18n = {"en": msg_en, "de": msg_de}
+    
+    status.chromadb, msg_en = check_chromadb("en")
+    _, msg_de = check_chromadb("de")
+    status.chromadb_message = msg_en
+    status.chromadb_message_i18n = {"en": msg_en, "de": msg_de}
+    
+    status.embeddings, msg_en = check_embeddings("en")
+    _, msg_de = check_embeddings("de")
+    status.embeddings_message = msg_en
+    status.embeddings_message_i18n = {"en": msg_en, "de": msg_de}
+    
+    status.stable_diffusion, msg_en = check_stable_diffusion("en")
+    _, msg_de = check_stable_diffusion("de")
+    status.sd_message = msg_en
+    status.sd_message_i18n = {"en": msg_en, "de": msg_de}
+
+    # Auto-detect provider if not explicitly set
+    if Config.LLM_PROVIDER == "auto":
+        if status.lmstudio:
+            Config.LLM_PROVIDER = "lmstudio"
+            log.info("Auto-detected LLM provider: LM Studio")
+        else:
+            Config.LLM_PROVIDER = "ollama"
+            log.info("Auto-detected LLM provider: Ollama")
 
     # Log a startup summary
     log.info("--- Service status ---")
+    log.info("  Active LLM Provider: %s", Config.LLM_PROVIDER.upper())
     for svc in status.summary():
         level = "OK" if svc["available"] else "UNAVAILABLE"
-        log.info("  %-35s [%s] %s", svc["name"], level, svc["message"])
+        log.info("  %-45s [%s] %s", svc["name"], level, svc["message"])
     log.info("----------------------")
 
     return status
@@ -240,9 +321,12 @@ def refresh_service_status() -> ServiceStatus:
 # ---------------------------------------------------------------------------
 
 
-def get_detailed_status() -> dict:
+def get_detailed_status(lang: str = "de") -> dict:
     """Get comprehensive diagnostic information for all services.
 
+    Args:
+        lang: Language code for localized messages (default: German)
+    
     Returns a dict with detailed status for each service including:
     - Connection status
     - Version/model info
@@ -252,13 +336,13 @@ def get_detailed_status() -> dict:
     """
     import platform
 
-    system_info = {
+    system_info: dict[str, Any] = {
         "platform": platform.system(),
         "platform_version": platform.version(),
         "python_version": platform.python_version(),
     }
 
-    if HAS_PSUTIL:
+    if HAS_PSUTIL and psutil is not None:
         system_info["memory_total_gb"] = round(psutil.virtual_memory().total / (1024**3), 1)
         system_info["memory_available_gb"] = round(psutil.virtual_memory().available / (1024**3), 1)
         system_info["memory_percent_used"] = psutil.virtual_memory().percent
@@ -271,36 +355,40 @@ def get_detailed_status() -> dict:
     }
 
     # Ollama diagnostics
-    ollama_diag = _diagnose_ollama()
+    ollama_diag = _diagnose_ollama(lang)
     diagnostics["services"]["ollama"] = ollama_diag
 
+    # LM Studio diagnostics
+    lmstudio_diag = _diagnose_lmstudio(lang)
+    diagnostics["services"]["lmstudio"] = lmstudio_diag
+
     # Whisper diagnostics
-    whisper_diag = _diagnose_whisper()
+    whisper_diag = _diagnose_whisper(lang)
     diagnostics["services"]["whisper"] = whisper_diag
 
     # ChromaDB diagnostics
-    chromadb_diag = _diagnose_chromadb()
+    chromadb_diag = _diagnose_chromadb(lang)
     diagnostics["services"]["chromadb"] = chromadb_diag
 
     # Embeddings diagnostics
-    embeddings_diag = _diagnose_embeddings()
+    embeddings_diag = _diagnose_embeddings(lang)
     diagnostics["services"]["embeddings"] = embeddings_diag
 
     # Stable Diffusion diagnostics
-    sd_diag = _diagnose_stable_diffusion()
+    sd_diag = _diagnose_stable_diffusion(lang)
     diagnostics["services"]["stable_diffusion"] = sd_diag
 
     # Database diagnostics
-    db_diag = _diagnose_database()
+    db_diag = _diagnose_database(lang)
     diagnostics["services"]["database"] = db_diag
 
     return diagnostics
 
 
-def _diagnose_ollama() -> dict:
+def _diagnose_ollama(lang: str = "de") -> dict:
     """Get detailed Ollama diagnostics."""
     diag = {
-        "name": "Ollama (LLM)",
+        "name": _t("service.ollama.name", lang),
         "icon": "brain",
         "available": False,
         "message": "",
@@ -329,14 +417,14 @@ def _diagnose_ollama() -> dict:
         diag["details"]["model_list"] = model_names[:10]  # Limit to 10
 
         if not model_names:
-            diag["message"] = "Connected, but no models installed"
+            diag["message"] = _t("service.ollama.no_models_connected", lang)
             diag["setup_instructions"] = f"Run: ollama pull {Config.OLLAMA_MODEL}"
         elif not any(Config.OLLAMA_MODEL in m for m in model_names):
-            diag["message"] = f"Connected, but model '{Config.OLLAMA_MODEL}' not found"
+            diag["message"] = _t("service.ollama.model_not_found_short", lang, model=Config.OLLAMA_MODEL)
             diag["setup_instructions"] = f"Run: ollama pull {Config.OLLAMA_MODEL}"
             diag["details"]["configured_model_available"] = False
         else:
-            diag["message"] = f"Connected - {len(model_names)} model(s) available"
+            diag["message"] = _t("service.ollama.connected_models_count", lang, count=len(model_names))
             diag["details"]["configured_model_available"] = True
 
             # Try to get model info
@@ -350,25 +438,93 @@ def _diagnose_ollama() -> dict:
                     break
 
     except requests.ConnectionError:
-        diag["message"] = "Cannot connect to Ollama"
+        diag["message"] = _t("service.ollama.cannot_connect", lang)
         diag["setup_instructions"] = (
-            "1. Install Ollama from https://ollama.ai\n"
-            "2. Start the server: ollama serve\n"
-            "3. Pull a model: ollama pull llama3.2"
+            f"1. {_t('setup.ollama.step1', lang)}\n"
+            f"2. {_t('setup.ollama.step2', lang)}\n"
+            f"3. {_t('setup.ollama.step3', lang, model=Config.OLLAMA_MODEL)}"
         )
     except requests.Timeout:
-        diag["message"] = "Connection timed out"
-        diag["setup_instructions"] = "Ollama may be overloaded. Try restarting: ollama serve"
+        diag["message"] = _t("service.ollama.connection_timeout", lang)
+        diag["setup_instructions"] = _t('setup.ollama.overloaded', lang)
     except Exception as e:
         diag["message"] = f"Error: {str(e)}"
 
     return diag
 
 
-def _diagnose_whisper() -> dict:
+def _diagnose_lmstudio(lang: str = "de") -> dict:
+    """Get detailed LM Studio diagnostics."""
+    diag = {
+        "name": _t("service.lmstudio.name", lang),
+        "icon": "cpu",
+        "available": False,
+        "message": "",
+        "details": {},
+        "setup_instructions": None,
+        "config": {
+            "endpoint": Config.LMSTUDIO_BASE_URL,
+            "model": Config.LMSTUDIO_MODEL,
+            "provider_active": Config.LLM_PROVIDER == "lmstudio",
+        },
+    }
+
+    url = f"{Config.LMSTUDIO_BASE_URL}/models"
+    try:
+        start = time.time()
+        resp = requests.get(url, timeout=5)
+        latency_ms = round((time.time() - start) * 1000, 1)
+        resp.raise_for_status()
+
+        payload = resp.json()
+        models = payload.get("data", []) if isinstance(payload, dict) else []
+        model_ids = [m.get("id", "") for m in models if isinstance(m, dict)]
+
+        diag["details"]["latency_ms"] = latency_ms
+        diag["details"]["models_available"] = len(model_ids)
+        diag["details"]["model_list"] = model_ids[:10]
+
+        if not model_ids:
+            diag["message"] = _t("service.lmstudio.no_models_loaded", lang)
+            diag["setup_instructions"] = _t("setup.lmstudio.load_model_first", lang)
+            return diag
+
+        configured_ok = any(Config.LMSTUDIO_MODEL == model_id for model_id in model_ids)
+        diag["details"]["configured_model_available"] = configured_ok
+
+        diag["available"] = True
+        if configured_ok:
+            diag["message"] = _t("service.lmstudio.connected_model_available", lang, model=Config.LMSTUDIO_MODEL)
+        else:
+            diag["message"] = _t("service.lmstudio.model_not_found", lang, model=Config.LMSTUDIO_MODEL)
+            diag["setup_instructions"] = _t("setup.lmstudio.set_model", lang)
+
+    except requests.ConnectionError:
+        diag["message"] = _t("service.lmstudio.cannot_connect", lang)
+        diag["setup_instructions"] = (
+            f"1. {_t('setup.lmstudio.step1', lang)}\n"
+            f"2. {_t('setup.lmstudio.step2', lang)}\n"
+            f"3. {_t('setup.lmstudio.step4', lang)}"
+        )
+    except requests.Timeout:
+        diag["message"] = _t("service.ollama.connection_timeout", lang)
+        diag["setup_instructions"] = _t('setup.ollama.overloaded', lang)
+    except Exception as e:
+        diag["message"] = f"Error: {str(e)}"
+        diag["setup_instructions"] = (
+            f"1. {_t('setup.lmstudio.step1', lang)}\n"
+            f"2. {_t('setup.lmstudio.step3', lang)}\n"
+            f"3. {_t('setup.lmstudio.step2', lang)}\n"
+            f"4. {_t('setup.lmstudio.step4', lang)}"
+        )
+
+    return diag
+
+
+def _diagnose_whisper(lang: str = "de") -> dict:
     """Get detailed Whisper diagnostics."""
     diag = {
-        "name": "Whisper (Voice)",
+        "name": _t("service.whisper.name", lang),
         "icon": "microphone",
         "available": False,
         "message": "",
@@ -382,7 +538,7 @@ def _diagnose_whisper() -> dict:
     try:
         import whisper
         diag["available"] = True
-        diag["message"] = f"Installed - '{Config.WHISPER_MODEL}' model ready"
+        diag["message"] = _t("service.whisper.installed_model_ready", lang, model=Config.WHISPER_MODEL)
         diag["details"]["whisper_version"] = getattr(whisper, "__version__", "unknown")
         diag["details"]["model_loaded"] = _whisper_model is not None
 
@@ -400,10 +556,10 @@ def _diagnose_whisper() -> dict:
         import shutil
         diag["details"]["ffmpeg_available"] = shutil.which("ffmpeg") is not None
         if not diag["details"]["ffmpeg_available"]:
-            diag["message"] += " (ffmpeg not found - some formats may fail)"
+            diag["message"] += " " + _t("service.whisper.ffmpeg_warning", lang)
 
     except ImportError:
-        diag["message"] = "openai-whisper not installed"
+        diag["message"] = _t("service.whisper.not_installed_short", lang)
         diag["setup_instructions"] = (
             "1. Install Whisper: pip install openai-whisper\n"
             "2. Install ffmpeg:\n"
@@ -415,10 +571,10 @@ def _diagnose_whisper() -> dict:
     return diag
 
 
-def _diagnose_chromadb() -> dict:
+def _diagnose_chromadb(lang: str = "de") -> dict:
     """Get detailed ChromaDB diagnostics."""
     diag = {
-        "name": "ChromaDB (Vector Store)",
+        "name": _t("service.chromadb.name", lang),
         "icon": "database",
         "available": False,
         "message": "",
@@ -455,10 +611,11 @@ def _diagnose_chromadb() -> dict:
                     total_size += os.path.getsize(fp)
         diag["details"]["disk_usage_mb"] = round(total_size / (1024 * 1024), 2)
 
-        diag["message"] = f"Operational - {count} documents indexed"
+        key = "service.chromadb.operational_one" if count == 1 else "service.chromadb.operational_other"
+        diag["message"] = _t(key, lang, count=count)
 
     except ImportError:
-        diag["message"] = "chromadb not installed"
+        diag["message"] = _t("service.chromadb.not_installed", lang)
         diag["setup_instructions"] = "pip install chromadb"
     except Exception as e:
         diag["message"] = f"Error: {str(e)}"
@@ -470,10 +627,10 @@ def _diagnose_chromadb() -> dict:
     return diag
 
 
-def _diagnose_embeddings() -> dict:
+def _diagnose_embeddings(lang: str = "de") -> dict:
     """Get detailed embeddings diagnostics."""
     diag = {
-        "name": "Sentence-Transformers (Embeddings)",
+        "name": _t("service.embeddings.name", lang),
         "icon": "vector",
         "available": False,
         "message": "",
@@ -488,7 +645,7 @@ def _diagnose_embeddings() -> dict:
         import sentence_transformers
         diag["available"] = True
         diag["details"]["version"] = getattr(sentence_transformers, "__version__", "unknown")
-        diag["message"] = f"Installed - model: {Config.EMBEDDING_MODEL}"
+        diag["message"] = _t("service.embeddings.installed_model", lang, model=Config.EMBEDDING_MODEL)
 
         # Check if model is downloaded
         from pathlib import Path
@@ -498,16 +655,16 @@ def _diagnose_embeddings() -> dict:
         diag["details"]["model_cached"] = model_path.exists() if cache_dir.exists() else "unknown"
 
     except ImportError:
-        diag["message"] = "sentence-transformers not installed"
+        diag["message"] = _t("service.embeddings.not_installed", lang)
         diag["setup_instructions"] = "pip install sentence-transformers"
 
     return diag
 
 
-def _diagnose_stable_diffusion() -> dict:
+def _diagnose_stable_diffusion(lang: str = "de") -> dict:
     """Get detailed Stable Diffusion diagnostics."""
     diag = {
-        "name": "Stable Diffusion (Images)",
+        "name": _t("service.stable_diffusion.name", lang),
         "icon": "image",
         "available": False,
         "message": "",
@@ -521,13 +678,13 @@ def _diagnose_stable_diffusion() -> dict:
     }
 
     if not Config.SD_ENABLED:
-        diag["message"] = "Disabled in configuration"
+        diag["message"] = _t("service.sd.disabled", lang)
         diag["details"]["reason"] = "SD_ENABLED=false"
         diag["setup_instructions"] = (
-            "To enable image generation:\n"
-            "1. Install Stable Diffusion WebUI (AUTOMATIC1111)\n"
-            "2. Start with API enabled: ./webui.sh --api\n"
-            "3. Set SD_ENABLED=true in .env"
+            f"{_t('setup.sd.enable_header')}\n"
+            f"1. {_t('setup.sd.install')}\n"
+            f"2. {_t('setup.sd.start_api')}\n"
+            f"3. {_t('setup.sd.enable_env')}"
         )
         return diag
 
@@ -546,7 +703,7 @@ def _diagnose_stable_diffusion() -> dict:
         if isinstance(models, list) and models:
             diag["details"]["models"] = [m.get("model_name", m.get("title", "unknown"))[:50] for m in models[:5]]
 
-        diag["message"] = f"Connected - {len(models)} model(s) available"
+        diag["message"] = _t("service.sd.connected_models_count", lang, count=len(models))
 
         # Try to get current model
         try:
@@ -558,14 +715,14 @@ def _diagnose_stable_diffusion() -> dict:
             pass
 
     except requests.ConnectionError:
-        diag["message"] = "Cannot connect to Stable Diffusion WebUI"
+        diag["message"] = _t("service.sd.cannot_connect", lang)
         diag["setup_instructions"] = (
             "1. Install AUTOMATIC1111 WebUI\n"
             "2. Start with: ./webui.sh --api\n"
             f"3. Ensure it's running at {Config.SD_API_URL}"
         )
     except requests.Timeout:
-        diag["message"] = "Connection timed out"
+        diag["message"] = _t("service.sd.connection_timeout", lang)
     except Exception as e:
         diag["message"] = f"Error: {str(e)}"
 
@@ -635,7 +792,7 @@ def _diagnose_stable_diffusion() -> dict:
         diag["message"] = "Cannot connect to Ollama"
         diag["setup_instructions"] = (
             "1. Install Ollama: https://ollama.ai\n"
-            "2. Start Ollama: ollama serve\n"
+            "2. Start the Ollama server: ollama serve\n"
             "3. Pull FLUX: ollama pull flux-schnell"
         )
     except requests.Timeout:
@@ -646,12 +803,12 @@ def _diagnose_stable_diffusion() -> dict:
     return diag
 
 
-def _diagnose_database() -> dict:
+def _diagnose_database(lang: str = "de") -> dict:
     """Get detailed database diagnostics."""
     import sqlite3
 
     diag = {
-        "name": "SQLite Database",
+        "name": _t("service.database.name", lang),
         "icon": "storage",
         "available": False,
         "message": "",
@@ -690,9 +847,9 @@ def _diagnose_database() -> dict:
             conn.close()
 
             diag["available"] = True
-            diag["message"] = f"Operational - {diag['details']['entry_count']} entries"
+            diag["message"] = _t("service.database.operational", lang, count=diag['details']['entry_count'])
         else:
-            diag["message"] = "Database file not found (will be created on first use)"
+            diag["message"] = _t("service.database.not_found", lang)
             diag["available"] = True
 
     except Exception as e:

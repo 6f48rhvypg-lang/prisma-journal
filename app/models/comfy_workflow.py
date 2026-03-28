@@ -7,9 +7,10 @@ soft pastel prism-style abstract artwork for journal entries.
 
 import json
 import random
+from typing import Optional
 
 
-def create_prism_workflow(prompt: str, seed: int = None, width: int = 768, height: int = 768) -> dict:
+def create_prism_workflow(prompt: str, seed: Optional[int] = None, width: int = 768, height: int = 768) -> dict:
     """
     Create a ComfyUI workflow for generating soft pastel prism-style artwork.
     
@@ -118,7 +119,7 @@ def create_prism_workflow(prompt: str, seed: int = None, width: int = 768, heigh
     return workflow
 
 
-def create_prism_workflow_with_refiner(prompt: str, seed: int = None, width: int = 768, height: int = 768) -> dict:
+def create_prism_workflow_with_refiner(prompt: str, seed: Optional[int] = None, width: int = 768, height: int = 768) -> dict:
     """
     Create a ComfyUI workflow using SDXL Base + Refiner for higher quality prism artwork.
     

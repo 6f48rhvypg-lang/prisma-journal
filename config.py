@@ -102,10 +102,19 @@ class Config:
     # -- Entry limits --------------------------------------------------------
     MAX_ENTRY_LENGTH = int(os.environ.get("MAX_ENTRY_LENGTH", "50000"))
 
+    # -- LLM Provider Selection ---------------------------------------------
+    # Choose between "ollama", "lmstudio", or "auto" (detect at startup)
+    LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "auto").lower()
+
     # -- Ollama (LLM) -------------------------------------------------------
     OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
     OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2")
     OLLAMA_TIMEOUT = int(os.environ.get("OLLAMA_TIMEOUT", "120"))
+
+    # -- LM Studio (Alternative LLM via OpenAI API) -------------------------
+    LMSTUDIO_BASE_URL = os.environ.get("LMSTUDIO_BASE_URL", "http://localhost:1234/v1")
+    LMSTUDIO_MODEL = os.environ.get("LMSTUDIO_MODEL", "llama-3.2-3b-instruct")
+    LMSTUDIO_TIMEOUT = int(os.environ.get("LMSTUDIO_TIMEOUT", "120"))
 
     # -- Whisper (Speech-to-text) --------------------------------------------
     WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "base")
@@ -131,6 +140,9 @@ class Config:
 
     # -- UI theme ------------------------------------------------------------
     COLOR_THEME = os.environ.get("COLOR_THEME", "monochrome")
+
+    # -- Language / i18n -----------------------------------------------------
+    DEFAULT_LANGUAGE = os.environ.get("DEFAULT_LANGUAGE", "de")  # "de" (German) or "en" (English)
 
     # -- Tag Auto-Suggestion -------------------------------------------------
     TAG_MODEL = os.environ.get("TAG_MODEL", "deepseek-r1:14b")
