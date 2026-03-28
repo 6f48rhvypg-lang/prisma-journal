@@ -83,6 +83,27 @@
             100% { opacity: 1; transform: scale(1) rotate(360deg); }
         }
     </style>
+    <style>
+        #logo-dark { display: none; }
+        .dark #logo-dark { display: block; }
+        .dark #logo-light { display: none; }
+        #bg-main { background-image: url('/static/images/Background_image.png'), linear-gradient(to bottom right, #f7f7f7, #f3f3f4, #ededee); }
+        .dark #bg-main { background-image: url('/static/images/Background_image_inverted.png'), linear-gradient(to bottom right, #111113, #17171a, #1c1c1f); }
+        /* Header dark mode */
+        .dark header { background-color: rgba(22, 22, 26, 0.85); border-color: #2a2a35; }
+        .dark header .text-surface-500 { color: #7a7a8a; }
+        /* Sidebar dark mode */
+        .dark #sidebar { background-color: #16161a; border-color: #2a2a35; }
+        .dark #sidebar a, .dark #sidebar .text-surface-700 { color: #c4c4cf; }
+        .dark #sidebar a:hover { background-color: #25252f; }
+        .dark #sidebar .text-surface-400 { color: #5a5a6a; }
+        .dark #sidebar .text-surface-500 { color: #7a7a8a; }
+        .dark #sidebar .text-surface-900 { color: #ececf0; }
+        .dark #sidebar button { color: #7a7a8a; }
+        .dark #sidebar button:hover { background-color: #25252f; }
+    </style>
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/images/favicon-32.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/images/favicon-180.png">
     <link rel="stylesheet" href="/static/css/custom.css">
     <style>
         /* Prevent flash of unanimated content */
@@ -91,12 +112,13 @@
     {% block head %}{% endblock %}
 </head>
 <body class="h-full text-surface-900 transition-colors duration-200 {{ ui_body_classes }}">
-    <div class="min-h-full flex" style="background-image: url('/static/images/Background_image.png'), linear-gradient(to bottom right, #f7f7f7, #f3f3f4, #ededee); background-size: cover; background-position: center; background-attachment: fixed;">
-        <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-64 -translate-x-full lg:translate-x-0 transition-transform duration-200 bg-white border-r border-surface-200 sidebar-shadow">
+    <div id="bg-main" class="min-h-full flex" style="background-size: cover; background-position: center; background-attachment: fixed;">
+        <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-80 -translate-x-full lg:translate-x-0 transition-transform duration-200 bg-white border-r border-surface-200 sidebar-shadow">
             <div class="flex flex-col h-full px-5 py-6">
                 <div class="flex items-center justify-between">
-                    <a href="/" class="flex items-center gap-2">
-                        <img src="/static/images/Prisma_logo.png" alt="PrismA" class="h-8 w-auto">
+                    <a href="/" class="flex-1 min-w-0 block">
+                        <img id="logo-light" src="/static/images/logo_light.png" alt="PrismA" class="w-full h-auto">
+                        <img id="logo-dark" src="/static/images/logo_dark.png" alt="PrismA" class="w-full h-auto">
                     </a>
                     <button id="sidebar-close" class="lg:hidden p-1.5 rounded-lg text-surface-500 hover:bg-surface-100" aria-label="Close sidebar">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -106,25 +128,25 @@
                 </div>
                 <p class="mt-1 text-xs text-surface-400">Secure Journal</p>
 
-                <nav class="mt-8 space-y-2">
-                    <a href="/" class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-xl text-surface-700 hover:bg-surface-100">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0h6"/></svg>
+                <nav class="mt-8 space-y-1">
+                    <a href="/" class="flex items-center gap-4 px-4 py-3 text-base font-medium rounded-xl text-surface-700 hover:bg-surface-100">
+                        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0h6"/></svg>
                         Dashboard
                     </a>
-                    <a href="/journal" class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-xl text-surface-700 hover:bg-surface-100">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6"/></svg>
+                    <a href="/journal" class="flex items-center gap-4 px-4 py-3 text-base font-medium rounded-xl text-surface-700 hover:bg-surface-100">
+                        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6"/></svg>
                         Journal
                     </a>
-                    <a href="/entry/new" class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-xl text-surface-700 hover:bg-surface-100">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    <a href="/entry/new" class="flex items-center gap-4 px-4 py-3 text-base font-medium rounded-xl text-surface-700 hover:bg-surface-100">
+                        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                         New Entry
                     </a>
-                    <a href="/ask" class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-xl text-surface-700 hover:bg-surface-100">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h6m-2 8a9 9 0 110-18 9 9 0 010 18z"/></svg>
+                    <a href="/ask" class="flex items-center gap-4 px-4 py-3 text-base font-medium rounded-xl text-surface-700 hover:bg-surface-100">
+                        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h6m-2 8a9 9 0 110-18 9 9 0 010 18z"/></svg>
                         Ask
                     </a>
-                    <a href="/search" class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-xl text-surface-700 hover:bg-surface-100">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    <a href="/search" class="flex items-center gap-4 px-4 py-3 text-base font-medium rounded-xl text-surface-700 hover:bg-surface-100">
+                        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                         Search
                     </a>
                 </nav>
@@ -151,7 +173,7 @@
 
         <div id="sidebar-overlay" class="fixed inset-0 bg-black/40 opacity-0 pointer-events-none transition-opacity duration-200 lg:hidden"></div>
 
-        <div class="flex-1 min-w-0 lg:ml-64">
+        <div class="flex-1 min-w-0 lg:ml-80">
             <header class="sticky top-0 z-30 bg-[#f5f5f5]/80 backdrop-blur border-b border-surface-200">
                 <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
                     <div class="flex items-center gap-3">

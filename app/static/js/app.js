@@ -7,11 +7,15 @@
     const toggle = document.getElementById('theme-toggle');
     const lightIcon = document.getElementById('theme-light-icon');
     const darkIcon = document.getElementById('theme-dark-icon');
+    const logoLight = document.getElementById('logo-light');
+    const logoDark = document.getElementById('logo-dark');
 
     function updateIcons() {
         const isDark = document.documentElement.classList.contains('dark');
         if (lightIcon) lightIcon.classList.toggle('hidden', !isDark);
         if (darkIcon) darkIcon.classList.toggle('hidden', isDark);
+        if (logoLight) logoLight.classList.toggle('hidden', isDark);
+        if (logoDark) logoDark.classList.toggle('hidden', !isDark);
     }
 
     updateIcons();
