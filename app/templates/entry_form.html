@@ -40,7 +40,7 @@
 
 {% block content %}
 <div class="max-w-5xl mx-auto">
-    <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-6">{% if editing %}{{ t('ui.entry.edit') }}{% else %}{{ t('ui.dashboard.new_entry') }}{% endif %}</h1>
+    <h1 class="font-display mb-6" style="font-size: 2rem; font-weight: 500; color: var(--text)">{% if editing %}{{ t('ui.entry.edit') }}{% else %}{{ t('ui.dashboard.new_entry') }}{% endif %}</h1>
 
     <div class="lg:grid lg:grid-cols-[minmax(0,1fr)_260px] lg:gap-8">
         <div>
@@ -114,13 +114,16 @@
         {% endif %}
 
         <!-- Content -->
-        <div>
-            <label for="content" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">{{ t('ui.entry.content') }}</label>
-            <textarea id="content" name="content" rows="14"
+        <div class="writing-container">
+            <label for="content" class="block text-xs mb-3" style="font-family: var(--font-mono, monospace); letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3)">
+                {{ t('ui.entry.content') }}
+            </label>
+            <textarea id="content" name="content" rows="16"
                       placeholder="{{ t('ui.dashboard.hero') }}"
-                      class="w-full rounded-lg border border-surface-300 dark:border-surface-600 px-4 py-3 text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none resize-y leading-relaxed">{{ entry.content if editing and entry else '' }}</textarea>
-            <div class="flex justify-between mt-1">
-                <span class="text-xs text-surface-400" id="word-count">0 {{ t('ui.journal.words', count='0').split()[0] }}</span>
+                      class="writing-surface">{{ entry.content if editing and entry else '' }}</textarea>
+            <div class="flex items-center justify-between mt-4 pt-3" style="border-top: 1px solid var(--border)">
+                <span id="word-count" class="meta">0 {{ t('ui.journal.words', count='0').split()[0] }}</span>
+                <span id="autosave-indicator" class="meta opacity-0 transition-opacity duration-300">saved</span>
             </div>
         </div>
 
@@ -276,93 +279,8 @@
             </div>
         </div>
 
-        <!-- Smart Tags Section -->
-        <div id="tags-section" class="border border-surface-200 dark:border-surface-700 rounded-lg bg-white dark:bg-surface-800 overflow-hidden">
-            <!-- Header -->
-            <div class="flex items-center justify-between px-4 py-3 border-b border-surface-100 dark:border-surface-700">
-                <div class="flex items-center gap-2">
-                    <span class="text-sm font-medium text-surface-700 dark:text-surface-300">Tags</span>
-                    <span id="tag-count-badge" class="hidden text-[10px] px-1.5 py-0.5 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300">0</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <span id="tag-suggest-spinner" class="hidden text-xs text-surface-400">
-                        <svg class="animate-spin h-3 w-3 inline mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        {{ t('ui.entry.tags.analyzing') }}
-                    </span>
-                    <button type="button" id="suggest-tags-btn" data-prompt-key="suggest_tags" onclick="TagSuggester.refreshSuggestions()"
-                            class="text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition">
-                        {{ t('ui.entry.tags.suggest') }}
-                    </button>
-                </div>
-            </div>
-
-            <!-- Baustellen Connections -->
-            <div id="baustellen-connections-panel" class="hidden border-b border-surface-100 dark:border-surface-700 px-4 py-2 bg-amber-50/50 dark:bg-amber-900/10">
-                <p class="text-xs text-amber-700 dark:text-amber-400 font-medium mb-1">{{ t('ui.entry.tags.connected_concerns') }}</p>
-                <div id="baustellen-connections-list" class="flex flex-wrap gap-1">
-                    <!-- Baustellen badges will render here -->
-                </div>
-            </div>
-
-            <!-- Tag Chips Container -->
-            <div class="px-4 py-3">
-                <div id="tag-chips-container" class="flex flex-wrap gap-2 mb-3">
-                    <!-- Tags will be rendered here by JavaScript -->
-                </div>
-
-                <!-- Tag Input -->
-                <div class="flex gap-2">
-                    <input type="text" id="tag-input"
-                           placeholder="{{ t('ui.entry.tags.input_placeholder') }}"
-                           class="flex-1 rounded-lg border border-surface-300 dark:border-surface-600 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
-                           onkeydown="TagSuggester.handleInputKeydown(event)">
-                    <input type="hidden" id="tags" name="tags" value="{{ entry.tags | join(', ') if editing and entry and entry.tags else '' }}">
-                    <button type="button" onclick="TagSuggester.addTagFromInput()"
-                            class="px-3 py-2 rounded-lg bg-surface-200 dark:bg-surface-600 text-surface-700 dark:text-surface-200 hover:bg-surface-300 dark:hover:bg-surface-500 transition">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Suggestions Panel -->
-            <div id="tag-suggestions-panel" class="hidden border-t border-surface-100 dark:border-surface-700">
-                <!-- Existing Tags Section -->
-                <div class="px-4 py-3 bg-surface-50 dark:bg-surface-700/30 border-b border-surface-100 dark:border-surface-700">
-                    <div class="flex items-center gap-2 mb-2">
-                        <svg class="w-3.5 h-3.5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/>
-                        </svg>
-                        <p class="text-xs font-medium text-surface-700 dark:text-surface-300">{{ t('ui.entry.tags.from_existing') }}</p>
-                        <span class="text-[10px] text-surface-400">{{ t('ui.entry.tags.known_categories') }}</span>
-                    </div>
-                    <div id="tag-suggestions-existing" class="flex flex-wrap gap-2">
-                        <!-- Existing tag suggestions will render here -->
-                    </div>
-                </div>
-
-                <!-- New Tags Section -->
-                <div class="px-4 py-3 bg-blue-50/50 dark:bg-blue-900/10">
-                    <div class="flex items-center gap-2 mb-2">
-                        <svg class="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                        </svg>
-                        <p class="text-xs font-medium text-blue-700 dark:text-blue-400">{{ t('ui.entry.tags.new_ideas') }}</p>
-                        <span class="text-[10px] text-blue-500">{{ t('ui.entry.tags.expand_system') }}</span>
-                    </div>
-                    <div id="tag-suggestions-new" class="flex flex-wrap gap-2">
-                        <!-- New tag suggestions will render here -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- Error/Info Message -->
-            <div id="tag-message" class="hidden px-4 py-2 border-t border-surface-100 dark:border-surface-700 text-xs"></div>
-        </div>
+        <!-- Hidden tags field: preserves existing tags on edit; empty for new entries (set by analysis) -->
+        <input type="hidden" name="tags" value="{{ entry.tags | join(', ') if editing and entry and entry.tags else '' }}">
 
         <!-- Submit -->
         <div class="flex gap-3">
@@ -450,6 +368,17 @@
                         <p id="analysis-step-4-text" class="text-sm font-medium text-surface-700 dark:text-surface-300">Generating artwork...</p>
                     </div>
                 </div>
+
+                <!-- Step 5: Insights -->
+                <div id="analysis-step-5" class="flex items-center gap-3 p-3 rounded-lg bg-surface-50 dark:bg-surface-700/50">
+                    <div id="analysis-step-5-icon" class="flex-shrink-0 w-6 h-6 flex items-center justify-center">
+                        <span class="analysis-step-pending w-2 h-2 rounded-full bg-surface-300 dark:bg-surface-500"></span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p id="analysis-step-5-text" class="text-sm font-medium text-surface-700 dark:text-surface-300">Generating AI insights...</p>
+                    </div>
+                </div>
+
             </div>
 
             <!-- Overall progress bar -->
@@ -1099,19 +1028,21 @@
     const analysisErrorText = document.getElementById('analysis-error-text');
     const analysisCancelBtn = document.getElementById('analysis-cancel-btn');
     const analysisActions = document.getElementById('analysis-actions');
+    const TOTAL_ANALYSIS_STEPS = 5;
 
     const STEP_LABELS = {
         1: 'Analyzing emotions...',
         2: 'Generating summary...',
         3: 'Identifying patterns...',
-        4: 'Generating artwork...'
+        4: 'Generating artwork...',
+        5: 'Generating AI insights...'
     };
 
     function showAnalysisModal() {
         analysisModal.classList.remove('hidden');
         document.body.style.overflow = 'hidden';
         // Reset all steps
-        for (let i = 1; i <= 4; i++) {
+        for (let i = 1; i <= TOTAL_ANALYSIS_STEPS; i++) {
             updateStepIcon(i, 'pending');
             document.getElementById(`analysis-step-${i}-text`).textContent = STEP_LABELS[i];
         }
@@ -1137,7 +1068,7 @@
 
         if (status === 'running') {
             iconContainer.innerHTML = `<div class="analysis-spinner text-primary-500"></div>`;
-        } else if (status === 'complete') {
+        } else if (status === 'complete' || status === 'skipped') {
             iconContainer.innerHTML = `
                 <svg class="analysis-checkmark" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
@@ -1239,10 +1170,11 @@
 
     function handleAnalysisEvent(data) {
         if (data.step === 'done') {
-            // Analysis complete — entry is saved, disable the leave-page warning
+            // Analysis complete - entry is saved, disable the leave-page warning
             hasUnsavedChanges = false;
             analysisProgressBar.style.width = '100%';
             analysisProgressText.textContent = `Analysis complete in ${data.result.processing_time}s`;
+
 
             // Update actions to show "View Entry" button
             analysisActions.innerHTML = `
@@ -1263,19 +1195,22 @@
             if (data.status === 'running') {
                 document.getElementById(`analysis-step-${data.step}-text`).textContent = data.message;
             } else if (data.status === 'complete') {
-                document.getElementById(`analysis-step-${data.step}-text`).textContent = data.message + ' ✓';
+                document.getElementById(`analysis-step-${data.step}-text`).textContent = data.message + ' OK';
+            } else if (data.status === 'skipped') {
+                document.getElementById(`analysis-step-${data.step}-text`).textContent = data.message;
             } else if (data.status === 'error') {
                 document.getElementById(`analysis-step-${data.step}-text`).textContent = 'Error: ' + data.message;
             }
 
             // Update progress bar
-            const progress = (data.step / 4) * 100;
-            if (data.status === 'complete') {
+            const stepWidth = 100 / TOTAL_ANALYSIS_STEPS;
+            const progress = (data.step / TOTAL_ANALYSIS_STEPS) * 100;
+            if (data.status === 'complete' || data.status === 'skipped' || data.status === 'error') {
                 analysisProgressBar.style.width = `${progress}%`;
             } else if (data.status === 'running') {
-                analysisProgressBar.style.width = `${progress - 25}%`;
+                analysisProgressBar.style.width = `${Math.max(0, progress - (stepWidth * 0.55))}%`;
             }
-            analysisProgressText.textContent = `Step ${data.step} of 4: ${STEP_LABELS[data.step]}`;
+            analysisProgressText.textContent = `Step ${data.step} of ${TOTAL_ANALYSIS_STEPS}: ${STEP_LABELS[data.step] || data.message}`;
         }
     }
 
@@ -1372,359 +1307,6 @@
             return e.returnValue;
         }
     });
-
-    // ── Smart Tag Suggestion System ──────────────────────────────────────────
-
-    const TagSuggester = {
-        tags: [],
-        isLoading: false,
-        debounceTimer: null,
-        lastContent: '',
-        lastSuggestions: null,
-
-        init() {
-            console.log('Smart TagSuggester.init() called');
-            // Parse existing tags from the hidden input
-            const hiddenInput = document.getElementById('tags');
-            if (hiddenInput && hiddenInput.value) {
-                this.tags = hiddenInput.value.split(',').map(t => t.trim()).filter(t => t);
-            }
-            this.renderTags();
-            this.updateTagCount();
-
-            // Set up content change listener for auto-suggestions
-            if (textarea) {
-                textarea.addEventListener('input', () => {
-                    this.onContentChange();
-                });
-            }
-        },
-
-        onContentChange() {
-            const content = textarea.value.trim();
-            console.log('TagSuggester.onContentChange called, content length:', content.length);
-
-            // Only suggest after 50 characters and when user pauses typing
-            if (content.length < 50) {
-                console.log('Content too short (<50), hiding suggestions');
-                this.hideSuggestions();
-                return;
-            }
-
-            // Don't re-suggest if content hasn't changed meaningfully
-            if (Math.abs(content.length - this.lastContent.length) < 20) {
-                console.log('Content change too small (<20 chars difference), skipping');
-                return;
-            }
-
-            // Debounce: wait 800ms after user stops typing
-            clearTimeout(this.debounceTimer);
-            console.log('Scheduling fetchSuggestions in 800ms');
-            this.debounceTimer = setTimeout(() => {
-                this.lastContent = content;
-                this.fetchSuggestions(content);
-            }, 800);
-        },
-
-        async fetchSuggestions(content) {
-            console.log('TagSuggester.fetchSuggestions called, isLoading:', this.isLoading);
-            if (this.isLoading) return;
-
-            this.isLoading = true;
-            this.showSpinner();
-
-            try {
-                console.log('Fetching /api/suggest-tags...');
-                const response = await fetch('/api/suggest-tags', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        content: content,
-                        existing_tags: this.tags,
-                        max_existing: 7,
-                        max_new: 6
-                    })
-                });
-
-                console.log('Response status:', response.status, response.ok);
-
-                if (!response.ok) {
-                    let errorMsg = `Server error (${response.status})`;
-                    try {
-                        const errData = await response.json();
-                        console.log('Error response data:', errData);
-                        if (errData.fallback) {
-                            this.renderSmartSuggestions({ existing: errData.existing || [], new: errData.new || [] });
-                            if (errData.message) {
-                                this.showMessage(errData.message, 'info');
-                            }
-                            return;
-                        }
-                        errorMsg = errData.error || errData.message || errorMsg;
-                    } catch (_) {}
-                    console.error('Tag suggestion failed:', errorMsg);
-                    this.showMessage(errorMsg, 'error');
-                    return;
-                }
-
-                const data = await response.json();
-                console.log('Tag suggestions received:', data);
-                this.lastSuggestions = data;
-
-                // Check if we got any suggestions
-                const hasExisting = (data.existing || []).length > 0;
-                const hasNew = (data.new || []).length > 0;
-
-                if (!hasExisting && !hasNew) {
-                    console.log('No suggestions returned from API');
-                    this.showMessage(i18nEntry.tagNoneAvailable, 'warning');
-                }
-
-                this.renderSmartSuggestions(data);
-                this.renderBaustellenConnections(data.baustellen_matches || []);
-            } catch (err) {
-                console.error('Tag suggestion error:', err);
-                this.showMessage(i18nEntry.tagLoadFailed, 'error');
-            } finally {
-                this.isLoading = false;
-                this.hideSpinner();
-            }
-        },
-
-        refreshSuggestions() {
-            const content = textarea.value.trim();
-            if (content.length >= 50) {
-                this.lastContent = ''; // Force refresh
-                this.fetchSuggestions(content);
-            } else {
-                this.showMessage(i18nEntry.tagMinChars, 'warning');
-            }
-        },
-
-        renderSmartSuggestions(data) {
-            console.log('TagSuggester.renderSmartSuggestions called with:', data);
-            const panel = document.getElementById('tag-suggestions-panel');
-            const existingList = document.getElementById('tag-suggestions-existing');
-            const newList = document.getElementById('tag-suggestions-new');
-
-            console.log('Elements found - panel:', !!panel, 'existingList:', !!existingList, 'newList:', !!newList);
-            if (!panel || !existingList || !newList) return;
-
-            // Filter out already-added tags
-            const existing = (data.existing || []).filter(s => !this.tags.includes(s.tag));
-            const newTags = (data.new || []).filter(s => !this.tags.includes(s.tag));
-
-            // Render existing tag suggestions
-            if (existing.length > 0) {
-                existingList.innerHTML = existing.map(s => `
-                    <button type="button" onclick="TagSuggester.addTag('${escapeHtml(s.tag)}', 'existing')"
-                            title="${escapeHtml(s.reason)}"
-                            class="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium bg-surface-200 dark:bg-surface-600 text-surface-700 dark:text-surface-200 hover:bg-primary-100 dark:hover:bg-primary-900/30 hover:text-primary-700 dark:hover:text-primary-300 transition border border-transparent hover:border-primary-300 dark:hover:border-primary-600">
-                        <span class="w-1.5 h-1.5 rounded-full bg-primary-400"></span>
-                        ${escapeHtml(displayTag(s.tag))}
-                        <span class="text-[10px] opacity-60 group-hover:opacity-100">${Math.round(s.score * 100)}%</span>
-                    </button>
-                `).join('');
-            } else {
-                existingList.innerHTML = `<span class="text-xs text-surface-400 italic">${i18nEntry.tagNoKnownMatches}</span>`;
-            }
-
-            // Render new tag suggestions
-            if (newTags.length > 0) {
-                newList.innerHTML = newTags.map(s => `
-                    <button type="button" onclick="TagSuggester.addTag('${escapeHtml(s.tag)}', 'new')"
-                            title="${escapeHtml(s.reason)}"
-                            class="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/50 transition border border-transparent hover:border-blue-400">
-                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-                        </svg>
-                        ${escapeHtml(displayTag(s.tag))}
-                        <span class="text-[10px] opacity-60">${i18nEntry.tagNewBadge}</span>
-                    </button>
-                `).join('');
-            } else {
-                newList.innerHTML = `<span class="text-xs text-surface-400 italic">${i18nEntry.tagNoNewIdeas}</span>`;
-            }
-
-            panel.classList.remove('hidden');
-            console.log('Suggestions panel shown');
-        },
-
-        renderBaustellenConnections(baustellen) {
-            const panel = document.getElementById('baustellen-connections-panel');
-            const list = document.getElementById('baustellen-connections-list');
-
-            if (!panel || !list) return;
-
-            if (baustellen.length === 0) {
-                panel.classList.add('hidden');
-                return;
-            }
-
-            const statusColors = {
-                'escalating': 'bg-red-100 text-red-700 border-red-300',
-                'stable': 'bg-yellow-100 text-yellow-700 border-yellow-300',
-                'improving': 'bg-green-100 text-green-700 border-green-300',
-                'dormant': 'bg-slate-100 text-slate-700 border-slate-300'
-            };
-
-            list.innerHTML = baustellen.map(b => `
-                <a href="#" onclick="event.preventDefault(); TagSuggester.showBaustelleDetails(${b.id})"
-                   class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium border ${statusColors[b.status] || statusColors['stable']} hover:opacity-80 transition">
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                    </svg>
-                    ${escapeHtml(b.headline)}
-                    ${b.match_count > 1 ? `<span class="text-[10px] opacity-70">(${b.match_count} Tags)</span>` : ''}
-                </a>
-            `).join('');
-
-            panel.classList.remove('hidden');
-        },
-
-        showBaustelleDetails(baustelleId) {
-            // Could open a modal with Baustelle details
-            // For now, just log it - could be enhanced
-            console.log('Show Baustelle details:', baustelleId);
-        },
-
-        renderTags() {
-            const container = document.getElementById('tag-chips-container');
-            if (!container) return;
-
-            if (this.tags.length === 0) {
-                container.innerHTML = `<span class="text-sm text-surface-400 italic">${i18nEntry.tagEmptyHint}</span>`;
-            } else {
-                container.innerHTML = this.tags.map(tag => `
-                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-sm font-medium bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-700">
-                        ${escapeHtml(displayTag(tag))}
-                        <button type="button" onclick="TagSuggester.removeTag('${escapeHtml(tag)}')"
-                                class="hover:text-primary-900 dark:hover:text-primary-100 focus:outline-none"
-                                aria-label="Remove tag ${escapeHtml(tag)}">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                            </svg>
-                        </button>
-                    </span>
-                `).join('');
-            }
-
-            // Update hidden input
-            const hiddenInput = document.getElementById('tags');
-            if (hiddenInput) {
-                hiddenInput.value = this.tags.join(', ');
-            }
-
-            this.updateTagCount();
-        },
-
-        updateTagCount() {
-            const badge = document.getElementById('tag-count-badge');
-            if (badge) {
-                if (this.tags.length > 0) {
-                    badge.textContent = this.tags.length;
-                    badge.classList.remove('hidden');
-                } else {
-                    badge.classList.add('hidden');
-                }
-            }
-        },
-
-        addTag(tag, source = 'manual') {
-            if (!tag || this.tags.includes(tag)) return;
-            
-            tag = tag.toLowerCase().trim().replace(/\s+/g, '-');
-            if (!tag || this.tags.includes(tag)) return;
-
-            // Add with animation
-            this.tags.push(tag);
-            this.renderTags();
-            
-            // Remove from suggestions
-            this.removeSuggestionWithAnimation(tag);
-            
-            // Refresh suggestions to get new ones if we got most of them
-            const remainingSuggestions = document.querySelectorAll('#tag-suggestions-existing button, #tag-suggestions-new button');
-            if (remainingSuggestions.length <= 2) {
-                setTimeout(() => this.onContentChange(), 500);
-            }
-        },
-
-        removeSuggestionWithAnimation(tag) {
-            const existingList = document.getElementById('tag-suggestions-existing');
-            const newList = document.getElementById('tag-suggestions-new');
-            
-            [existingList, newList].forEach(list => {
-                if (!list) return;
-                const buttons = list.querySelectorAll('button');
-                buttons.forEach(btn => {
-                    const btnTag = btn.textContent.trim().toLowerCase().replace(/\s+/g, '-');
-                    if (btnTag === tag.toLowerCase()) {
-                        btn.classList.add('tag-leaving');
-                        setTimeout(() => btn.remove(), 300);
-                    }
-                });
-            });
-        },
-
-        removeTag(tag) {
-            this.tags = this.tags.filter(t => t !== tag);
-            this.renderTags();
-        },
-
-        addTagFromInput() {
-            const input = document.getElementById('tag-input');
-            if (!input) return;
-            
-            const value = input.value.trim();
-            if (value) {
-                const newTags = value.split(',').map(t => t.trim()).filter(t => t);
-                newTags.forEach(tag => this.addTag(tag, 'manual'));
-                input.value = '';
-            }
-        },
-
-        handleInputKeydown(event) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                this.addTagFromInput();
-            }
-        },
-
-        hideSuggestions() {
-            const panel = document.getElementById('tag-suggestions-panel');
-            if (panel) panel.classList.add('hidden');
-        },
-
-        showSpinner() {
-            const spinner = document.getElementById('tag-suggest-spinner');
-            if (spinner) spinner.classList.remove('hidden');
-        },
-
-        hideSpinner() {
-            const spinner = document.getElementById('tag-suggest-spinner');
-            if (spinner) spinner.classList.add('hidden');
-        },
-
-        showMessage(message, type = 'info') {
-            const msgEl = document.getElementById('tag-message');
-            if (!msgEl) return;
-
-            const colors = {
-                info: 'text-blue-600 dark:text-blue-400',
-                warning: 'text-amber-600 dark:text-amber-400',
-                error: 'text-red-600 dark:text-red-400'
-            };
-
-            msgEl.textContent = message;
-            msgEl.className = `px-4 py-2 border-t border-surface-100 dark:border-surface-700 text-xs ${colors[type] || colors.info}`;
-            msgEl.classList.remove('hidden');
-
-            setTimeout(() => {
-                msgEl.classList.add('hidden');
-            }, 5000);
-        }
-    };
 
     // ── Voice Recording ─────────────────────────────────────────────────
     let voiceRecorder = null;
@@ -1857,9 +1439,5 @@
     }
 
     // Initialize TagSuggester
-    TagSuggester.init();
-
-    // Expose globally for onclick handlers
-    window.TagSuggester = TagSuggester;
 </script>
 {% endblock %}

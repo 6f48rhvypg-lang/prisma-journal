@@ -4,69 +4,135 @@
 {% block content %}
 <div class="max-w-3xl mx-auto">
     <!-- Header -->
-    <div class="flex justify-between items-start mb-8">
-        <div>
-            <h1 class="text-3xl font-bold text-surface-900">{{ entry.title or entry.summary or 'Journal Entry' }}</h1>
-            <div class="flex items-center gap-3 mt-2 text-sm text-surface-500">
-                <span>{{ entry.created_at[:10] }}</span>
-                <span class="bg-surface-100 px-2 py-0.5 rounded-full text-xs">{{ entry.entry_type }}</span>
-                <span class="text-xs">{{ entry.word_count }} words</span>
-                {% if entry.emotions %}
-                    {% for em in entry.emotions %}
-                    <span class="bg-surface-100 px-2 py-0.5 rounded-full text-xs">{{ em.emotion }} ({{ em.intensity }})</span>
-                    {% endfor %}
-                {% endif %}
-                {% if entry.tags %}
-                    {% for tag in entry.tags %}
-                    <span class="bg-primary-50 text-primary-700 px-2 py-0.5 rounded-full text-xs">{{ tag }}</span>
-                    {% endfor %}
-                {% endif %}
+    <div class="flex justify-between items-start mb-8 gap-6">
+        <div class="flex-1 min-w-0">
+            <h1 class="font-display leading-tight" style="font-size: 2.1rem; font-weight: 500; color: var(--text)">{{ entry.title or entry.summary or 'Tagebucheintrag' }}</h1>
+            <div class="flex flex-wrap items-center gap-3 mt-2 text-sm text-surface-500 dark:text-surface-400">
+                <span class="font-medium">{{ entry.created_at[:10] }}</span>
             </div>
+            {% if entry.emotions %}
+            <div class="flex flex-wrap gap-2 mt-3">
+                {% set intensity_colors = {'high': 'border-opacity-60', 'medium': 'border-opacity-40', 'low': 'border-opacity-20'} %}
+                {% set emotion_map = {
+                    'joy': ('bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-600', '●'),
+                    'sadness': ('bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-600', '●'),
+                    'anger': ('bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-300 dark:border-red-600', '●'),
+                    'fear': ('bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-600', '●'),
+                    'surprise': ('bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-600', '●'),
+                    'disgust': ('bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-300 dark:border-green-600', '●'),
+                    'trust': ('bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-600', '●'),
+                    'anticipation': ('bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-300 border-teal-300 dark:border-teal-600', '●')
+                } %}
+                {% for em in entry.emotions %}
+                {% set style = emotion_map.get(em.emotion, ('bg-surface-100 dark:bg-surface-700 text-surface-600 dark:text-surface-300 border-surface-300 dark:border-surface-600', '●')) %}
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border {{ style[0] }}">
+                    <span class="opacity-60 text-[8px] leading-none">{{ style[1] }}</span>
+                    {{ em.emotion }}
+                    <span class="opacity-50 font-normal">{{ em.intensity }}</span>
+                </span>
+                {% endfor %}
+            </div>
+            {% endif %}
         </div>
-        <div class="flex gap-2">
-            <a href="/ask?entry_id={{ entry.id }}" class="bg-surface-900 text-white text-sm font-medium px-4 py-2 rounded-lg transition">Discuss</a>
-            <a href="/entry/{{ entry.id }}/edit" class="bg-surface-100 hover:bg-surface-200 text-surface-700 text-sm font-medium px-4 py-2 rounded-lg transition">Edit</a>
-            <form method="POST" action="/entry/{{ entry.id }}/delete" onsubmit="return confirm('Delete this entry?')">
-                <button type="submit" class="bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium px-4 py-2 rounded-lg transition">Delete</button>
+        <div class="flex gap-2 flex-shrink-0">
+            <a href="/ask?entry_id={{ entry.id }}" class="bg-surface-900 dark:bg-surface-700 hover:bg-surface-800 dark:hover:bg-surface-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition">Besprechen</a>
+            <a href="/entry/{{ entry.id }}/edit" class="bg-surface-100 dark:bg-surface-700 hover:bg-surface-200 dark:hover:bg-surface-600 text-surface-700 dark:text-surface-200 text-sm font-medium px-4 py-2 rounded-lg transition">Bearbeiten</a>
+            <form method="POST" action="/entry/{{ entry.id }}/delete" onsubmit="return confirm('Diesen Eintrag wirklich löschen?')">
+                <button type="submit" class="bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 text-sm font-medium px-4 py-2 rounded-lg transition">Löschen</button>
             </form>
         </div>
     </div>
 
     <!-- Content -->
-    <div class="bg-white dark:bg-surface-800 rounded-2xl border border-surface-200 dark:border-surface-700 p-8 mb-8">
+    <div class="surface-panel p-8 mb-8">
         <div class="prose text-surface-800 dark:text-surface-100 whitespace-pre-wrap leading-relaxed">{{ entry.content }}</div>
+    </div>
+
+    <!-- Tags -->
+    <div class="surface-panel p-6 mb-8">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-50">Tags</h2>
+            <button onclick="suggestTags()" id="suggest-tags-btn"
+                    class="text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition flex items-center gap-1">
+                <svg id="suggest-tags-spinner" class="hidden animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Tags vorschlagen
+            </button>
+        </div>
+
+        <!-- Current tags -->
+        <div id="tag-chips" class="flex flex-wrap gap-2 mb-4 min-h-[2rem]">
+            {% if entry.tags %}
+                {% for tag in entry.tags %}
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-sm font-medium bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-700">
+                    {{ tag }}
+                    <button type="button" onclick="removeTag('{{ tag }}')"
+                            class="hover:text-primary-900 dark:hover:text-primary-100 focus:outline-none ml-0.5">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </span>
+                {% endfor %}
+            {% else %}
+                <span id="tag-empty-hint" class="text-sm text-surface-400 dark:text-surface-500 italic">Noch keine Tags. Analysiere den Eintrag oder füge Tags manuell hinzu.</span>
+            {% endif %}
+        </div>
+
+        <!-- Add tag input -->
+        <div class="flex gap-2 mb-4">
+            <input type="text" id="tag-input" placeholder="Tag hinzufügen (Enter drücken)"
+                   class="flex-1 rounded-lg border border-surface-300 dark:border-surface-600 px-3 py-2 text-sm text-surface-900 dark:text-surface-100 bg-white dark:bg-surface-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();addTagFromInput();}">
+            <button type="button" onclick="addTagFromInput()"
+                    class="px-3 py-2 rounded-lg bg-surface-200 dark:bg-surface-600 text-surface-700 dark:text-surface-200 hover:bg-surface-300 dark:hover:bg-surface-500 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- AI Suggestions panel (hidden until suggestTags() runs) -->
+        <div id="tag-suggestions-panel" class="hidden border-t border-surface-100 dark:border-surface-700 pt-4">
+            <div class="mb-3">
+                <p class="text-xs font-medium text-surface-500 dark:text-surface-400 mb-2">Bekannte Tags</p>
+                <div id="tag-suggestions-existing" class="flex flex-wrap gap-2"></div>
+            </div>
+            <div>
+                <p class="text-xs font-medium text-blue-600 dark:text-blue-400 mb-2">Neue Tags</p>
+                <div id="tag-suggestions-new" class="flex flex-wrap gap-2"></div>
+            </div>
+        </div>
+
+        <p id="tag-status" class="hidden text-xs text-surface-400 dark:text-surface-500 mt-2"></p>
     </div>
 
     <!-- AI Analysis -->
     <div class="bg-white dark:bg-surface-800 rounded-2xl border border-surface-200 dark:border-surface-700 p-8 mb-8">
         <div class="flex justify-between items-center mb-4">
-            <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-50">AI Insights</h2>
+            <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-50">Reflexion</h2>
             <button onclick="analyzeEntry()" id="analyze-btn" class="bg-primary-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-primary-700 transition">
-                {% if entry.summary %}Re-analyze{% else %}Analyze{% endif %}
+                {% if entry.summary %}Neu analysieren{% else %}Analysieren{% endif %}
             </button>
         </div>
-        <div id="analysis-content" class="prose text-surface-700 dark:text-surface-300 text-sm whitespace-pre-wrap">
-            {% if entry.summary %}
-                {{ entry.summary }}
-            {% else %}
-                <p class="text-surface-400 dark:text-surface-500 italic">Click "Analyze" to get AI-powered insights about this entry.</p>
-            {% endif %}
-        </div>
+        <div id="analysis-content" class="prose text-surface-700 dark:text-surface-300 text-sm whitespace-pre-wrap">{% if entry.summary %}{{ entry.summary | trim }}{% else %}<p class="text-surface-400 dark:text-surface-500 italic">Klicke auf "Analysieren", um eine Reflexion zu erhalten.</p>{% endif %}</div>
     </div>
 
     <!-- Entry Artwork -->
     <div class="bg-white dark:bg-surface-800 rounded-2xl border border-surface-200 dark:border-surface-700 p-8 mb-8">
         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
             <div>
-                <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-50">Entry Artwork</h2>
-                <p class="text-xs text-surface-400 dark:text-surface-500 mt-1">AI-generated artwork based on your entry's mood and themes. Created locally.</p>
+                <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-50">Bildwerk</h2>
+                <p class="text-xs text-surface-400 dark:text-surface-500 mt-1">KI-generiertes Bild basierend auf Stimmung und Themen des Eintrags. Lokal erstellt.</p>
                 {% if ui_settings and ui_settings.artwork_enabled == 'false' %}
-                <p class="text-xs text-amber-600 dark:text-amber-500 mt-1">Artwork generation is disabled in settings.</p>
+                <p class="text-xs text-amber-600 dark:text-amber-500 mt-1">Bildgenerierung ist in den Einstellungen deaktiviert.</p>
                 {% endif %}
             </div>
             <div class="flex flex-wrap items-center gap-2">
                 <button onclick="toggleAdvancedControls()" id="advanced-toggle" class="text-xs text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-300 underline">
-                    Show Advanced
+                    Erweitert anzeigen
                 </button>
             </div>
         </div>
@@ -75,9 +141,9 @@
         <div id="advanced-controls" class="hidden mb-4 p-4 bg-surface-50 dark:bg-surface-700/50 rounded-lg">
             <div class="flex flex-wrap items-center gap-2">
                 <button onclick="generateArtwork(true)" id="regen-btn" class="bg-surface-100 dark:bg-surface-600 hover:bg-surface-200 dark:hover:bg-surface-500 text-surface-700 dark:text-surface-50 text-sm font-medium px-4 py-2 rounded-lg transition {% if ui_settings and ui_settings.artwork_enabled == 'false' %}opacity-50 cursor-not-allowed{% endif %}" {% if ui_settings and ui_settings.artwork_enabled == 'false' %}disabled{% endif %}>
-                    Regenerate with New Seed
+                    Neu generieren
                 </button>
-                <span class="text-xs text-surface-400 dark:text-surface-500">Creates a completely new variation</span>
+                <span class="text-xs text-surface-400 dark:text-surface-500">Erstellt eine komplett neue Variation</span>
             </div>
         </div>
         
@@ -88,16 +154,16 @@
                     <img src="{{ entry.artwork_path }}" alt="Generated artwork" class="rounded-xl max-w-md" loading="lazy">
                     {% else %}
                     <div class="rounded-xl border border-dashed border-surface-200 dark:border-surface-700 p-6 text-sm text-surface-400 dark:text-surface-500">
-                        Artwork will be generated automatically when you analyze this entry.
+                        Das Bild wird automatisch generiert, sobald du den Eintrag analysierst.
                     </div>
                     {% endif %}
                 </div>
                 <p id="artwork-status" class="text-xs text-surface-400 dark:text-surface-500 mt-2"></p>
             </div>
             <div class="w-full md:w-64">
-                <div class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">Upload your own</div>
+                <div class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">Eigenes Bild hochladen</div>
                 <input type="file" id="artwork-upload" accept="image/*" class="w-full text-sm border border-surface-200 dark:border-surface-700 dark:bg-surface-700 dark:text-surface-100 rounded-lg px-3 py-2">
-                <button onclick="uploadArtwork()" id="upload-btn" class="mt-2 w-full bg-surface-100 dark:bg-surface-600 hover:bg-surface-200 dark:hover:bg-surface-500 text-surface-700 dark:text-surface-50 text-sm font-medium px-4 py-2 rounded-lg transition">Upload Image</button>
+                <button onclick="uploadArtwork()" id="upload-btn" class="mt-2 w-full bg-surface-100 dark:bg-surface-600 hover:bg-surface-200 dark:hover:bg-surface-500 text-surface-700 dark:text-surface-50 text-sm font-medium px-4 py-2 rounded-lg transition">Bild hochladen</button>
                 <p class="text-xs text-surface-400 dark:text-surface-500 mt-2">PNG, JPG, WEBP, GIF</p>
             </div>
         </div>
@@ -106,7 +172,7 @@
     <!-- Similar Entries -->
     {% if similar %}
     <div class="mb-8">
-        <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-4">Related Entries</h2>
+        <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-4">Ähnliche Einträge</h2>
         <div class="space-y-3">
             {% for s in similar %}
             <a href="/entry/{{ s.id }}" class="block bg-white dark:bg-surface-800 rounded-xl border border-surface-200 dark:border-surface-700 p-4 hover:border-primary-300 dark:hover:border-primary-600 transition">
@@ -125,12 +191,144 @@
     const entryId = {{ entry.id | tojson }};
     const entryContent = {{ entry.content | tojson }};
 
+    // ── Inline Tag Editor ────────────────────────────────────────────────
+    let currentTags = {{ (entry.tags or []) | tojson }};
+
+    function escapeHtml(str) {
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function renderTagChips() {
+        const container = document.getElementById('tag-chips');
+        const hint = document.getElementById('tag-empty-hint');
+        if (!container) return;
+        if (currentTags.length === 0) {
+            container.innerHTML = '<span id="tag-empty-hint" class="text-sm text-surface-400 dark:text-surface-500 italic">Noch keine Tags. Analysiere den Eintrag oder füge Tags manuell hinzu.</span>';
+            return;
+        }
+        container.innerHTML = currentTags.map(tag => `
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-sm font-medium bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-700">
+                ${escapeHtml(tag)}
+                <button type="button" onclick="removeTag('${escapeHtml(tag)}')"
+                        class="hover:text-primary-900 dark:hover:text-primary-100 focus:outline-none ml-0.5">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </span>
+        `).join('');
+    }
+
+    async function saveTags() {
+        await fetch(`/api/entry/${entryId}/tags`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tags: currentTags })
+        });
+    }
+
+    function removeTag(tag) {
+        currentTags = currentTags.filter(t => t !== tag);
+        renderTagChips();
+        // Remove from suggestions panel if present
+        document.querySelectorAll('#tag-suggestions-existing button, #tag-suggestions-new button').forEach(btn => {
+            if (btn.dataset.tag === tag) btn.classList.remove('opacity-50', 'pointer-events-none');
+        });
+        saveTags();
+    }
+
+    function addTag(tag) {
+        tag = tag.toLowerCase().trim().replace(/\s+/g, '-');
+        if (!tag || currentTags.includes(tag)) return;
+        currentTags.push(tag);
+        renderTagChips();
+        // Grey out the suggestion button
+        document.querySelectorAll('#tag-suggestions-existing button, #tag-suggestions-new button').forEach(btn => {
+            if (btn.dataset.tag === tag) btn.classList.add('opacity-50', 'pointer-events-none');
+        });
+        saveTags();
+    }
+
+    function addTagFromInput() {
+        const input = document.getElementById('tag-input');
+        if (!input || !input.value.trim()) return;
+        input.value.split(',').map(t => t.trim()).filter(t => t).forEach(t => addTag(t));
+        input.value = '';
+    }
+
+    function showTagStatus(msg, duration = 3000) {
+        const el = document.getElementById('tag-status');
+        if (!el) return;
+        el.textContent = msg;
+        el.classList.remove('hidden');
+        setTimeout(() => el.classList.add('hidden'), duration);
+    }
+
+    async function suggestTags() {
+        const btn = document.getElementById('suggest-tags-btn');
+        const spinner = document.getElementById('suggest-tags-spinner');
+        btn.disabled = true;
+        spinner.classList.remove('hidden');
+        try {
+            const resp = await fetch('/api/suggest-tags', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: entryContent, existing_tags: currentTags, max_existing: 10, max_new: 8 })
+            });
+            const data = await resp.json();
+            renderTagSuggestions(data);
+        } catch (e) {
+            showTagStatus('Tag-Vorschläge fehlgeschlagen.');
+        } finally {
+            btn.disabled = false;
+            spinner.classList.add('hidden');
+        }
+    }
+
+    function renderTagSuggestions(data) {
+        const panel = document.getElementById('tag-suggestions-panel');
+        const existingEl = document.getElementById('tag-suggestions-existing');
+        const newEl = document.getElementById('tag-suggestions-new');
+        const existing = (data.existing || []).filter(s => !currentTags.includes(s.tag));
+        const newTags = (data.new || []).filter(s => !currentTags.includes(s.tag));
+
+        existingEl.innerHTML = existing.length ? existing.map(s => `
+            <button type="button" data-tag="${escapeHtml(s.tag)}" onclick="addTag('${escapeHtml(s.tag)}')"
+                    title="${escapeHtml(s.reason || '')}"
+                    class="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium bg-surface-200 dark:bg-surface-600 text-surface-700 dark:text-surface-200 hover:bg-primary-100 dark:hover:bg-primary-900/30 hover:text-primary-700 dark:hover:text-primary-300 transition border border-transparent hover:border-primary-300">
+                <span class="w-1.5 h-1.5 rounded-full bg-primary-400"></span>
+                ${escapeHtml(s.tag)}
+                <span class="text-[10px] opacity-50 group-hover:opacity-100">${Math.round((s.score || 0) * 100)}%</span>
+            </button>
+        `).join('') : '<span class="text-xs text-surface-400 italic">Keine bekannten Tags gefunden.</span>';
+
+        newEl.innerHTML = newTags.length ? newTags.map(s => `
+            <button type="button" data-tag="${escapeHtml(s.tag)}" onclick="addTag('${escapeHtml(s.tag)}')"
+                    title="${escapeHtml(s.reason || '')}"
+                    class="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/50 transition border border-transparent hover:border-blue-400">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                </svg>
+                ${escapeHtml(s.tag)}
+                <span class="text-[10px] opacity-50 group-hover:opacity-80">neu</span>
+            </button>
+        `).join('') : '<span class="text-xs text-surface-400 italic">Keine neuen Tag-Ideen.</span>';
+
+        panel.classList.remove('hidden');
+        if (!existing.length && !newTags.length) showTagStatus('Keine weiteren Tag-Vorschläge verfügbar.');
+    }
+
+    // Auto-suggest tags on page load if entry has none yet
+    if (currentTags.length === 0) {
+        suggestTags();
+    }
+
     async function analyzeEntry() {
         const btn = document.getElementById('analyze-btn');
         const content = document.getElementById('analysis-content');
-        btn.textContent = 'Analyzing...';
+        btn.textContent = 'Analysiere...';
         btn.disabled = true;
-        if (window.AILoader) AILoader.show('Analyzing entry...');
+        if (window.AILoader) AILoader.show('Eintrag wird analysiert...');
         try {
             const resp = await fetch('/api/analyze', {
                 method: 'POST',
@@ -138,12 +336,12 @@
                 body: JSON.stringify({ content: entryContent, entry_id: entryId })
             });
             const data = await resp.json();
-            content.textContent = data.analysis || 'No analysis returned.';
+            content.textContent = data.analysis || 'Keine Analyse zurückgegeben.';
         } catch (e) {
-            content.textContent = 'Analysis failed. Is Ollama running?';
+            content.textContent = 'Analyse fehlgeschlagen. Läuft Ollama?';
         }
         if (window.AILoader) AILoader.hide();
-        btn.textContent = 'Re-analyze';
+        btn.textContent = 'Neu analysieren';
         btn.disabled = false;
     }
 
@@ -152,10 +350,10 @@
         const toggle = document.getElementById('advanced-toggle');
         if (controls.classList.contains('hidden')) {
             controls.classList.remove('hidden');
-            toggle.textContent = 'Hide Advanced';
+            toggle.textContent = 'Erweitert ausblenden';
         } else {
             controls.classList.add('hidden');
-            toggle.textContent = 'Show Advanced';
+            toggle.textContent = 'Erweitert anzeigen';
         }
     }
 
@@ -165,18 +363,18 @@
         regenBtn.disabled = isLoading;
         uploadBtn.disabled = isLoading;
         if (isLoading) {
-            regenBtn.textContent = label || 'Regenerating...';
+            regenBtn.textContent = label || 'Generiere...';
         } else {
-            regenBtn.textContent = 'Regenerate with New Seed';
+            regenBtn.textContent = 'Neu generieren';
         }
     }
 
     async function generateArtwork(regenerate) {
         const container = document.getElementById('image-content');
         const status = document.getElementById('artwork-status');
-        setArtworkLoading(true, 'Generating...');
-        status.textContent = 'Generating artwork...';
-        if (window.AILoader) AILoader.show('Generating artwork...');
+        setArtworkLoading(true, 'Generiere...');
+        status.textContent = 'Bild wird generiert...';
+        if (window.AILoader) AILoader.show('Bild wird generiert...');
         try {
             const resp = await fetch('/api/generate/artwork', {
                 method: 'POST',
@@ -185,13 +383,13 @@
             });
             const data = await resp.json();
             if (data.image_url) {
-                container.innerHTML = '<img src="' + data.image_url + '" alt="Generated artwork" class="rounded-xl max-w-md" loading="lazy">';
-                status.textContent = 'Generated in ' + (data.generation_time || 0) + 's.';
+                container.innerHTML = '<img src="' + data.image_url + '" alt="Generiertes Bild" class="rounded-xl max-w-md" loading="lazy">';
+                status.textContent = 'Generiert in ' + (data.generation_time || 0) + 's.';
             } else {
-                status.textContent = data.error || 'Generation failed.';
+                status.textContent = data.error || 'Generierung fehlgeschlagen.';
             }
         } catch (e) {
-            status.textContent = 'Image generation failed.';
+            status.textContent = 'Bildgenerierung fehlgeschlagen.';
         }
         if (window.AILoader) AILoader.hide();
         setArtworkLoading(false);
@@ -208,8 +406,8 @@
         const formData = new FormData();
         formData.append('entry_id', entryId);
         formData.append('image', input.files[0]);
-        setArtworkLoading(true, 'Uploading...');
-        status.textContent = 'Uploading image...';
+        setArtworkLoading(true, 'Lädt hoch...');
+        status.textContent = 'Bild wird hochgeladen...';
         try {
             const resp = await fetch('/api/upload/artwork', {
                 method: 'POST',
@@ -217,13 +415,13 @@
             });
             const data = await resp.json();
             if (data.image_url) {
-                container.innerHTML = '<img src="' + data.image_url + '" alt="Uploaded artwork" class="rounded-xl max-w-md" loading="lazy">';
-                status.textContent = 'Upload complete.';
+                container.innerHTML = '<img src="' + data.image_url + '" alt="Hochgeladenes Bild" class="rounded-xl max-w-md" loading="lazy">';
+                status.textContent = 'Upload abgeschlossen.';
             } else {
-                status.textContent = data.error || 'Upload failed.';
+                status.textContent = data.error || 'Upload fehlgeschlagen.';
             }
         } catch (e) {
-            status.textContent = 'Upload failed.';
+            status.textContent = 'Upload fehlgeschlagen.';
         }
         setArtworkLoading(false);
     }

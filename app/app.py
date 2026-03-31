@@ -4,6 +4,7 @@ import re
 import sys
 import os
 import argparse
+import threading
 from urllib.parse import urlparse
 
 # Ensure project root is on the path so config can be imported
@@ -150,6 +151,10 @@ log = logging.getLogger(__name__)
 app = Flask(__name__)
 app.config.from_object(Config)
 os.makedirs(Config.UPLOAD_FOLDER, exist_ok=True)
+
+# Background generation state (daily question)
+_bg_lock = threading.Lock()
+_bg_generating: dict = {}  # date -> True while a background thread is running
 
 # Enable response compression (gzip)
 Compress(app)
@@ -1024,6 +1029,10 @@ def settings():
         settings_message=settings_message,
         settings_errors=settings_errors,
         restart_warnings=restart_warnings,
+        system_prompts=[],
+        prompt_categories={},
+        prompt_category_descriptions={},
+        prompt_placeholders={},
     )
 
 
@@ -1900,8 +1909,8 @@ def api_suggest_tags():
     
     content = data.get("content", "").strip()
     existing_tags_raw = data.get("existing_tags", []) or []
-    max_existing = min(int(data.get("max_existing", 7)), 10)
-    max_new = min(int(data.get("max_new", 6)), 10)
+    max_existing = min(int(data.get("max_existing", 12)), 20)
+    max_new = min(int(data.get("max_new", 8)), 20)
     
     # Normalize existing tags
     existing_tags = [t.lower().strip().replace(' ', '-') for t in existing_tags_raw if t]
@@ -2071,6 +2080,18 @@ def _find_similar_tag(tag_name, existing_tags, threshold=0.8):
     
     matches = difflib.get_close_matches(tag_name, existing_tags, n=1, cutoff=threshold)
     return matches[0] if matches else None
+
+
+@app.route("/api/entry/<entry_id>/tags", methods=["POST"])
+def api_update_entry_tags(entry_id):
+    """Replace all tags for an entry. Used by the inline tag editor on the entry view page."""
+    entry = get_entry(entry_id)
+    if not entry:
+        return jsonify({"error": "Entry not found"}), 404
+    data = request.get_json() or {}
+    tags = [t.strip().lower() for t in data.get("tags", []) if isinstance(t, str) and t.strip()]
+    set_tags(entry_id, tags)
+    return jsonify({"tags": tags})
 
 
 @app.route("/api/tags/popular")
@@ -2585,16 +2606,46 @@ def _find_similar_baustelle(headline, existing_baustellen, threshold=0.85):
 # ---------------------------------------------------------------------------
 
 
+def _generate_daily_question_bg(today):
+    """Background worker: generate and save today's daily question."""
+    try:
+        if not has_previous_entries() or not status.llm_ok:
+            log.debug("Daily question bg: skipped (no entries or LLM offline)")
+            return
+        recent_entries = get_all_entries(limit=10)
+        recent_summaries = [
+            _entry_summary_snippet(e, max_len=200)
+            for e in recent_entries
+            if e.get("content")
+        ]
+        if not recent_summaries:
+            log.debug("Daily question bg: skipped (no summaries)")
+            return
+        result = generate_daily_question(recent_summaries)
+        if "question" in result:
+            create_daily_question(today, result["question"])
+            log.debug("Daily question bg: saved question for %s", today)
+        else:
+            log.warning("Daily question bg: generation returned error: %s", result.get("error"))
+    except Exception as e:
+        log.error("Daily question bg: unexpected error: %s", e, exc_info=True)
+    finally:
+        with _bg_lock:
+            _bg_generating.pop(today, None)
+
+
 def _get_or_generate_daily_question():
-    """Get today's daily question, generating a new one if needed.
+    """Get today's daily question.  If none exists yet, kick off a background
+    thread to generate it and return a pending placeholder immediately so the
+    HTTP request is never blocked by an Ollama call.
 
     Returns:
         dict with keys: question, is_new, is_answered, date
-        or dict with key: error
+        Includes ``pending: True`` when generation is still in progress.
     """
     today = datetime.now().strftime("%Y-%m-%d")
 
-    # Check if we already have a question for today
+    # Fast path: already in DB
     existing = get_daily_question(today)
     if existing:
         return {
@@ -2604,7 +2655,7 @@ def _get_or_generate_daily_question():
             "date": today,
         }
 
-    # Check if there are previous entries to personalize from
+    # Cheap checks before spawning a thread
     if not has_previous_entries():
         return {
             "question": _t("daily_question.default"),
@@ -2616,7 +2667,6 @@ def _get_or_generate_daily_question():
             "message": _t("daily_question.start_journaling"),
         }
 
-    # Check if LLM is available
     if not status.llm_ok:
         return {
             "question": _t("daily_question.default"),
@@ -2627,130 +2677,33 @@ def _get_or_generate_daily_question():
             "message": _t("daily_question.ai_offline"),
         }
 
-    # Get recent entry summaries to generate a personalized question
-    recent_entries = get_all_entries(limit=10)
-    recent_summaries = [
-        _entry_summary_snippet(e, max_len=200)
-        for e in recent_entries
-        if e.get("content")
-    ]
+    # Kick off background generation (only once per day)
+    with _bg_lock:
+        if not _bg_generating.get(today):
+            _bg_generating[today] = True
+            threading.Thread(
+                target=_generate_daily_question_bg, args=(today,), daemon=True
+            ).start()
 
-    if not recent_summaries:
-        return {
-            "question": _t("daily_question.default"),
-            "is_new": False,
-            "is_answered": False,
-            "date": today,
-            "fallback": True,
-        }
-
-    # Generate a new question
-    result = generate_daily_question(recent_summaries)
-    if "error" in result:
-        return {
-            "question": _t("daily_question.default"),
-            "is_new": False,
-            "is_answered": False,
-            "date": today,
-            "fallback": True,
-            "message": result["error"],
-        }
-
-    # Save the generated question
-    question_text = result.get("question", _t("daily_question.default"))
-    create_daily_question(today, question_text)
-
+    # Return immediately with a placeholder; frontend polls for the real one
     return {
-        "question": question_text,
-        "is_new": True,
+        "question": _t("daily_question.default"),
+        "is_new": False,
         "is_answered": False,
         "date": today,
+        "pending": True,
     }
 
 
 @app.route("/api/dashboard/stats")
 def api_dashboard_stats():
-    """Get dashboard statistics including streak, entry count, daily question, and personalized prompts."""
+    """Get dashboard statistics. Returns immediately — daily question generation
+    runs in the background and the client polls /api/daily-question/today."""
     streak = get_streak()
     entry_count = get_entry_count()
     total_words = get_total_words()
     top_emotion_data = get_top_emotion()
     daily_question = _get_or_generate_daily_question()
-    
-    # Generate personalized prompts for "Explore More" section
-    personalized_prompts = None
-    if entry_count >= 3:
-        try:
-            records = get_all_entry_embeddings()
-            clusters = _cluster_embeddings(records)
-            
-            def cluster_label(cluster):
-                entry_id = cluster["entries"][0].get("entry_id") if cluster.get("entries") else None
-                if not entry_id:
-                    return "past reflections"
-                entry = get_entry(entry_id)
-                if not entry:
-                    return "past reflections"
-                if entry.get("tags"):
-                    return entry["tags"][0]
-                if entry.get("summary"):
-                    return entry["summary"][:80]
-                return entry.get("content", "")[:80].strip() or "past reflections"
-            
-            # Under-explored topics (clusters with <=2 entries)
-            under_explored = []
-            for cluster in sorted(clusters, key=lambda c: c["count"]):
-                if cluster["count"] <= 2:
-                    under_explored.append(cluster_label(cluster))
-                if len(under_explored) >= 3:
-                    break
-            
-            # Revisit topics (not touched in 90+ days)
-            revisit_candidates = []
-            for cluster in clusters:
-                dates = []
-                for entry in cluster.get("entries", []):
-                    meta_date = entry.get("metadata", {}).get("date")
-                    parsed = _parse_date(meta_date)
-                    if parsed:
-                        dates.append(parsed)
-                if not dates:
-                    continue
-                latest = max(dates)
-                if (datetime.now() - latest).days >= 90:
-                    revisit_candidates.append((latest, cluster_label(cluster)))
-            revisit_candidates.sort(key=lambda item: item[0])
-            revisit_topics = [label for _, label in revisit_candidates[:3]]
-            
-            # Recent topics for context
-            recent_cutoff = datetime.now().timestamp() - (30 * 24 * 60 * 60)
-            recent_topics = []
-            for rec in records:
-                meta_date = rec.get("metadata", {}).get("date")
-                parsed = _parse_date(meta_date)
-                if not parsed or parsed.timestamp() < recent_cutoff:
-                    continue
-                tags = rec.get("metadata", {}).get("tags", "")
-                if tags:
-                    for tag in str(tags).split(","):
-                        tag = tag.strip()
-                        if tag and tag not in recent_topics:
-                            recent_topics.append(tag)
-                if len(recent_topics) >= 5:
-                    break
-            
-            prompt_result = generate_personalized_prompts_from_embeddings(
-                under_explored_topics=under_explored,
-                revisit_topics=revisit_topics,
-                recent_topics=recent_topics,
-                entry_count=entry_count,
-            )
-            
-            if "prompts" in prompt_result:
-                personalized_prompts = prompt_result["prompts"]
-        except Exception as e:
-            # Silently fail - this is an enhancement, not critical
-            pass
 
     return jsonify({
         "streak": streak,
@@ -2758,7 +2711,6 @@ def api_dashboard_stats():
         "total_words": total_words,
         "top_emotion": top_emotion_data.get("emotion") if top_emotion_data else None,
         "daily_question": daily_question,
-        "personalized_prompts": personalized_prompts,
     })
 
 
@@ -2805,6 +2757,31 @@ def api_calendar():
 
     days = [{"date": row["day"], "count": row["count"]} for row in rows]
     return jsonify({"year": year, "month": month, "days": days})
+
+
+@app.route("/api/daily-question/today")
+def api_daily_question_today():
+    """Lightweight read-only endpoint: return today's question from DB.
+
+    Returns ``pending: true`` while background generation is still running so
+    the client can keep polling without triggering a new LLM call.
+    """
+    today = datetime.now().strftime("%Y-%m-%d")
+    existing = get_daily_question(today)
+    if existing:
+        return jsonify({
+            "question": existing["question_text"],
+            "is_answered": existing["is_answered"],
+            "date": today,
+            "pending": False,
+        })
+    with _bg_lock:
+        still_generating = _bg_generating.get(today, False)
+    return jsonify({
+        "question": _t("daily_question.default"),
+        "date": today,
+        "pending": still_generating,
+    })
 
 
 @app.route("/api/daily-question/answered", methods=["POST"])

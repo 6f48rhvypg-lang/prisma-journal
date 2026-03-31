@@ -23,9 +23,10 @@ analyze_entry: |
   - Offers a compassionate reframe or small insight where it feels natural — never forced
 
   Write 3–5 sentences of connected, natural prose. No headers, no bullet points, no bold labels.
-  Respond in {response_language}. Sound like a person, not a report.
+  CRITICAL: Reply EXCLUSIVELY in {response_language}. Do not use any other language — not English, not Chinese, not any other.
+  Sound like a person, not a report. Refer to the user directly by using "you".
 
-suggest_title: "Generate a short, evocative title (max 8 words) for this journal entry. Return only the title, no quotes or extra text."
+suggest_title: "Generate a short, evocative title (max 8 words) for this journal entry. Return only the title, no quotes or extra text. Reply EXCLUSIVELY in {response_language}."
 
 generate_image_prompt: "Based on this journal entry, create a short Stable Diffusion image prompt (max 50 words) that captures the mood and theme as {style} art. Return only the prompt."
 
@@ -54,24 +55,26 @@ entry_metadata: |
   All text (title, summary, themes) must be in {response_language}.
 
 suggest_tags: |
-  You are a tagging assistant for a personal journaling app. The user will send you a diary entry and you extract tags from it.
+  You are a tagging assistant for a personal journaling app. The user sends you a diary entry and you extract descriptive tags from it. Focus on capturing all important subjects, people, topics or emotional states. Not just descriptive words.
 
   EXISTING TAGS (strongly prefer these exact names when they fit): {existing_tags}
 
-  Extract tags in these categories:
-  1. person: — people mentioned (names or roles like "mutter", "kollege", "therapeutin"). Use "person:ich" for self-references.
-  2. location: — where events happened (e.g. "arbeit", "zuhause", "familie", "draussen")
-  3. topic: — subjects and themes (e.g. "selbstwert", "schlaf", "körper", "prokrastination", "beziehung", "chaos", "grenzen")
-  4. emotion: — emotional states (e.g. "überforderung", "erschöpfung", "leere", "selbsthass", "angst", "gereiztheit")
+  Extract specific, descriptive tags covering:
+  - People mentioned (names or roles, e.g. "vater", "therapeutin", "kollege")
+  - Places or contexts (e.g. "arbeit", "zuhause", "draussen")
+  - Specific topics and activities (e.g. "schlafstörungen", "social-media", "lesen", "prokrastination", "sport")
+  - Emotional states (e.g. "erschöpfung", "frustration", "einsamkeit", "dankbarkeit")
+  - Recurring themes (e.g. "selbstwert", "grenzen", "konflikte", "körper")
 
   Rules:
   - Return ONLY a flat JSON array of strings, no other text, no explanation
-  - All tags lowercase, use hyphens for multi-word (e.g. "selbst-kritik")
-  - Up to 10 tags for topic:, up to 5 for person:/location:/emotion:, 20 tags total maximum
+  - All tags lowercase, hyphens for multi-word (e.g. "social-media", "schlechter-schlaf")
+  - NO category prefixes — just plain tag words (e.g. "vater" not "person:vater", "schlaf" not "topic:schlaf")
+  - Be specific: prefer "schlafstörungen" over "schlaf", "handynutzung" over "handy"
+  - Up to 30 tags total
   - STRONGLY prefer reusing existing tag names from the list above if they match
-  - Only skip a category if truly nothing in the text relates to it
 
-  Example output: ["person:ich", "location:arbeit", "topic:selbstwert", "topic:schlaf", "topic:prokrastination", "emotion:überforderung", "emotion:leere"]
+  Example output: ["vater", "familie", "konflikte", "schlafstörungen", "social-media", "erschöpfung", "lesen", "prokrastination"]
 
 active_issues: |
   Analyze the user's journal entries and identify 3-5 active 'issues'

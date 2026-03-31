@@ -1,80 +1,549 @@
-/* Additional custom styles beyond Tailwind */
+/* ═══════════════════════════════════════════════════════════════════
+   PrismA Design System — "Still Light"
+   A quiet dark room. A single beam refracts into spectrum.
+   Warm paper in light / Deep charcoal in dark.
+   Accent: iridescent prism (violet → sky → emerald → lime).
+═══════════════════════════════════════════════════════════════════ */
 
-/* Smooth transitions on interactive elements */
-a, button, input, select, textarea {
-    transition: all 0.15s ease-in-out;
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:wght@300;400;500&family=DM+Mono&display=swap');
+
+/* ── Design Tokens ──────────────────────────────────────────────── */
+:root {
+  /* Backgrounds */
+  --bg:           #f8f6f1;
+  --surface:      #ffffff;
+  --surface-2:    #f3f1ec;
+  --surface-3:    #ede9e2;
+
+  /* Borders */
+  --border:       #e6e2d9;
+  --border-subtle:#f0ede8;
+
+  /* Text */
+  --text:         #1a1714;
+  --text-2:       #7a7268;
+  --text-3:       #b8b3a9;
+
+  /* Prism */
+  --prism: linear-gradient(145deg, #8b7cf8 0%, #42b8ea 38%, #35d4a0 68%, #c5e84a 100%);
+  --accent:       #8b7cf8;
+  --accent-dim:   rgba(139,124,248,0.12);
+  --accent-glow:  rgba(139,124,248,0.35);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(26,23,20,0.04);
+  --shadow-md: 0 4px 18px -3px rgba(26,23,20,0.08), 0 1px 4px rgba(26,23,20,0.04);
+  --shadow-lg: 0 12px 40px -8px rgba(26,23,20,0.12), 0 3px 10px rgba(26,23,20,0.06);
+  --shadow-focus: 0 0 0 3px var(--accent-dim), 0 4px 18px -3px rgba(26,23,20,0.08);
+
+  /* Fonts */
+  --font-display: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  --font-ui:      'DM Sans', system-ui, -apple-system, sans-serif;
+  --font-mono:    'DM Mono', 'Fira Mono', ui-monospace, monospace;
+
+  /* Sidebar */
+  --sidebar-w: 240px;
 }
 
-/* Card fade-in animation - top to bottom with lightness */
+.dark {
+  --bg:           #0e0e12;
+  --surface:      #141419;
+  --surface-2:    #1c1c23;
+  --surface-3:    #242430;
+  --border:       #272730;
+  --border-subtle:#1e1e26;
+  --text:         #eceaf5;
+  --text-2:       #6b697c;
+  --text-3:       #35343f;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.35);
+  --shadow-md: 0 4px 20px -3px rgba(0,0,0,0.45), 0 1px 6px rgba(0,0,0,0.25);
+  --shadow-lg: 0 16px 48px -8px rgba(0,0,0,0.6), 0 4px 14px rgba(0,0,0,0.3);
+}
+
+/* ── Base ───────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+html { height: 100%; }
+
+body {
+  font-family: var(--font-ui);
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: 15px;
+}
+
+body.ui-font-small  { font-size: 14px; }
+body.ui-font-medium { font-size: 15px; }
+body.ui-font-large  { font-size: 17px; }
+body.ui-compact main   { padding-top: 1.5rem;  padding-bottom: 1.5rem; }
+body.ui-comfortable main { padding-top: 2.5rem; padding-bottom: 2.5rem; }
+
+/* ── Background ─────────────────────────────────────────────────── */
+#bg-main {
+  background: var(--bg) !important;
+  min-height: 100%;
+  display: flex;
+}
+.dark #bg-main { background: var(--bg) !important; }
+
+/* Override the bg-image inline style in dark mode */
+#bg-main { background-image: none !important; }
+
+/* ── Typography ─────────────────────────────────────────────────── */
+h1, h2, h3, .font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+  font-weight: 500;
+}
+
+h1 { font-size: 2rem;   line-height: 1.2; }
+h2 { font-size: 1.5rem; line-height: 1.3; }
+h3 { font-size: 1.2rem; line-height: 1.4; }
+
+.mono, time.mono { font-family: var(--font-mono); font-size: 0.8em; }
+
+/* Prose (entry content & writing) */
+.prose {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  line-height: 1.85;
+  color: var(--text);
+  max-width: 68ch;
+}
+.prose p { margin-bottom: 1.15em; }
+
+/* ── Sidebar ────────────────────────────────────────────────────── */
+#sidebar {
+  width: var(--sidebar-w);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  box-shadow: none;
+  position: relative;
+}
+
+/* The prism stripe — a 2px vertical gradient along the sidebar's left edge */
+#sidebar::after {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 2px;
+  background: var(--prism);
+  opacity: 0.65;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Override Tailwind dark sidebar rules */
+.dark #sidebar { background: var(--surface) !important; border-color: var(--border) !important; }
+.dark #sidebar a,
+.dark #sidebar .text-surface-700 { color: var(--text-2) !important; }
+.dark #sidebar a:hover { background: var(--surface-2) !important; }
+.dark #sidebar .text-surface-400,
+.dark #sidebar .text-surface-500 { color: var(--text-3) !important; }
+.dark #sidebar .text-surface-900 { color: var(--text) !important; }
+.dark #sidebar button { color: var(--text-2) !important; }
+.dark #sidebar button:hover { background: var(--surface-2) !important; }
+
+/* Nav items */
+#sidebar nav a {
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: var(--text-2);
+  border-radius: 10px;
+  padding: 0.6rem 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  position: relative;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+#sidebar nav a:hover {
+  color: var(--text);
+  background: var(--surface-2);
+  text-decoration: none;
+}
+
+/* Active nav state — prismatic left-edge accent */
+#sidebar nav a.nav-active {
+  color: var(--text) !important;
+  background: var(--surface-2) !important;
+  font-weight: 500;
+}
+
+#sidebar nav a.nav-active::before {
+  content: '';
+  position: absolute;
+  left: -1rem;
+  top: 20%;
+  bottom: 20%;
+  width: 3px;
+  background: var(--prism);
+  border-radius: 0 3px 3px 0;
+}
+
+/* Nav icons */
+#sidebar nav a svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+  opacity: 0.7;
+  transition: opacity 0.12s ease;
+}
+#sidebar nav a:hover svg,
+#sidebar nav a.nav-active svg { opacity: 1; }
+
+/* Sidebar tagline */
+#sidebar .sidebar-tagline {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-top: 0.35rem;
+}
+
+/* Theme toggle & bottom links */
+#sidebar .sidebar-bottom {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+header {
+  background: color-mix(in srgb, var(--bg) 82%, transparent) !important;
+  border-bottom: 1px solid var(--border) !important;
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+}
+.dark header { background: color-mix(in srgb, var(--bg) 78%, transparent) !important; }
+
+/* New Entry pill in header */
+header a[href="/entry/new"] {
+  background: var(--text) !important;
+  color: var(--bg) !important;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+}
+header a[href="/entry/new"]:hover { opacity: 0.8; transform: translateY(-1px); }
+
+/* ── Surfaces / Cards ───────────────────────────────────────────── */
+.surface-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-md);
+}
+
+.surface-plain {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+/* Card base — used throughout */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.15s ease;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--border);
+  transform: translateY(-1px);
+}
+
+/* Tailwind card override for bg-white cards */
+.bg-white,
+.dark .dark\:bg-surface-800 {
+  background: var(--surface) !important;
+}
+
+/* ── Dark mode card overrides ────────────────────────────────────── */
+.dark .bg-white { background: var(--surface) !important; }
+.dark .border-surface-200,
+.dark .dark\:border-surface-700 { border-color: var(--border) !important; }
+
+/* ── Writing Surface ────────────────────────────────────────────── */
+.writing-surface,
+textarea#content {
+  font-family: var(--font-display) !important;
+  font-size: 1.25rem !important;
+  line-height: 1.9 !important;
+  color: var(--text) !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  resize: none;
+  width: 100%;
+  padding: 0 !important;
+  letter-spacing: 0.005em;
+}
+
+textarea#content::placeholder {
+  color: var(--text-3) !important;
+  font-style: italic;
+  font-weight: 400;
+}
+
+textarea#content:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+  ring: none !important;
+}
+
+/* Writing container — the card that holds the textarea */
+.writing-container {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 2.5rem 3rem;
+  box-shadow: var(--shadow-md);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.writing-container:focus-within {
+  border-color: transparent;
+  box-shadow: var(--shadow-lg), 0 0 0 1px rgba(139,124,248,0.2);
+}
+
+/* ── Form Controls ──────────────────────────────────────────────── */
+input[type="text"],
+input[type="email"],
+input[type="search"],
+select,
+textarea:not(#content) {
+  font-family: var(--font-ui);
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+  border-radius: 10px;
+  transition: border-color 0.12s ease, box-shadow 0.15s ease;
+}
+
+input:focus,
+select:focus,
+textarea:not(#content):focus {
+  outline: none;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+/* ── Buttons ────────────────────────────────────────────────────── */
+.btn-prism {
+  background: var(--prism);
+  color: #fff;
+  font-family: var(--font-ui);
+  font-weight: 500;
+  font-size: 0.875rem;
+  padding: 0.625rem 1.25rem;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.btn-prism:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px -4px var(--accent-glow);
+}
+
+/* ── Prism Utilities ────────────────────────────────────────────── */
+.prism-line {
+  height: 1px;
+  background: var(--prism);
+  opacity: 0.4;
+  border: none;
+}
+
+.prism-text {
+  background: var(--prism);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.prism-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--prism);
+  flex-shrink: 0;
+}
+
+/* ── Tags ───────────────────────────────────────────────────────── */
+.tag-chip {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+}
+
+/* ── Meta text (timestamps, word counts) ───────────────────────── */
+.meta {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+}
+
+/* ── Emotion badges ─────────────────────────────────────────────── */
+.emotion-badge {
+  font-family: var(--font-ui);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.025em;
+  padding: 0.2rem 0.65rem;
+  border-radius: 20px;
+  border-width: 1px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* ── Loader ─────────────────────────────────────────────────────── */
+.hb-loader svg { stroke: var(--accent); }
+
+/* ── Scrollbar ──────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+
+/* ── Focus ring ─────────────────────────────────────────────────── */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ── Sidebar shadow (left rail) ─────────────────────────────────── */
+.sidebar-shadow { box-shadow: 2px 0 16px -4px rgba(0,0,0,0.06); }
+.dark .sidebar-shadow { box-shadow: 2px 0 20px -4px rgba(0,0,0,0.4); }
+
+/* ── Animations ─────────────────────────────────────────────────── */
 @keyframes cardFadeIn {
-    0% {
-        opacity: 0;
-        transform: translateY(-20px);
-    }
-    100% {
-        opacity: 1;
-        transform: translateY(0);
-    }
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .card-fade-in {
-    animation: cardFadeIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-    opacity: 0;
+  animation: cardFadeIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  opacity: 0;
 }
 
-/* Staggered delays for top-to-bottom flow */
-.card-fade-in-delay-1 { animation-delay: 0.1s; }
-.card-fade-in-delay-2 { animation-delay: 0.2s; }
-.card-fade-in-delay-3 { animation-delay: 0.35s; }
-.card-fade-in-delay-4 { animation-delay: 0.5s; }
-.card-fade-in-delay-5 { animation-delay: 0.65s; }
-.card-fade-in-delay-6 { animation-delay: 0.8s; }
+.card-fade-in-delay-1 { animation-delay: 0.07s; }
+.card-fade-in-delay-2 { animation-delay: 0.14s; }
+.card-fade-in-delay-3 { animation-delay: 0.23s; }
+.card-fade-in-delay-4 { animation-delay: 0.34s; }
+.card-fade-in-delay-5 { animation-delay: 0.46s; }
+.card-fade-in-delay-6 { animation-delay: 0.60s; }
 
-/* Line clamp utility (for browsers without native support) */
-.line-clamp-2 {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-}
-
-.line-clamp-3 {
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-}
-
-/* Recording dot pulse */
+/* ── Recording dot ──────────────────────────────────────────────── */
 .recording-dot {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #ef4444;
-    animation: recPulse 1.2s ease-in-out infinite;
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f87171;
+  animation: recPulse 1.4s ease-in-out infinite;
 }
 
 @keyframes recPulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.3; }
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.3; transform: scale(0.82); }
 }
 
-/* Indeterminate progress bar */
+/* ── Progress bar ───────────────────────────────────────────────── */
 .progress-bar-track {
-    height: 4px;
-    border-radius: 2px;
-    overflow: hidden;
+  height: 2px;
+  border-radius: 1px;
+  overflow: hidden;
+  background: var(--surface-2);
 }
 
 .progress-bar-fill {
-    height: 100%;
-    width: 40%;
-    border-radius: 2px;
-    animation: progressSlide 1.4s ease-in-out infinite;
+  height: 100%;
+  width: 35%;
+  border-radius: 1px;
+  background: var(--prism);
+  animation: progressSlide 1.6s ease-in-out infinite;
 }
 
 @keyframes progressSlide {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(350%); }
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(370%); }
+}
+
+/* ── Line clamp utilities ───────────────────────────────────────── */
+.line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.line-clamp-4 { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* ── Tag animation ──────────────────────────────────────────────── */
+.tag-entering {
+  opacity: 0;
+  transform: scale(0.8) translateY(-8px);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.tag-entered {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+.tag-leaving {
+  opacity: 0;
+  transform: scale(0.8) translateX(-16px);
+  transition: all 0.25s ease-out;
+}
+
+/* Suggestion button hover lift */
+#tag-suggestions-list button:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── Topic flip card (dashboard) ───────────────────────────────── */
+.topic-card { perspective: 1200px; }
+.topic-card-inner {
+  transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-style: preserve-3d;
+}
+.topic-card:hover .topic-card-inner,
+.topic-card.is-flipped .topic-card-inner { transform: rotateY(180deg); }
+.topic-face { backface-visibility: hidden; }
+.topic-back { transform: rotateY(180deg); }
+
+/* ── Prevent flash of unanimated content ───────────────────────── */
+.card-fade-in { opacity: 0; }
+
+/* ── Soft ring ──────────────────────────────────────────────────── */
+.soft-ring { box-shadow: 0 0 0 1px var(--border); }
+
+/* ── Global transitions ─────────────────────────────────────────── */
+a, button {
+  transition: color 0.12s ease, background 0.12s ease,
+              box-shadow 0.15s ease, border-color 0.12s ease,
+              opacity 0.12s ease, transform 0.1s ease;
+}
+input, select, textarea {
+  transition: border-color 0.12s ease, box-shadow 0.15s ease;
 }

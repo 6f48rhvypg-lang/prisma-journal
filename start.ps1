@@ -120,7 +120,7 @@ if (-not $needsWarning) {
 Write-Host "      Done" -ForegroundColor Green
 
 # --- Ollama ---
-Write-Host "[4/4] Checking Ollama..." -ForegroundColor Yellow
+Write-Host "[4/5] Checking Ollama..." -ForegroundColor Yellow
 $ollamaRunning = $false
 try {
     $response = Invoke-WebRequest -Uri "http://localhost:11434/api/tags" -TimeoutSec 2 -UseBasicParsing
@@ -186,6 +186,43 @@ if ($ollamaRunning) {
         }
     } else {
         Write-Host "      Ollama not found - install from ollama.ai" -ForegroundColor DarkYellow
+    }
+}
+
+# --- ComfyUI ---
+Write-Host "[5/5] Checking ComfyUI..." -ForegroundColor Yellow
+$comfyRunning = $false
+try {
+    $response = Invoke-WebRequest -Uri "http://127.0.0.1:8188" -TimeoutSec 2 -UseBasicParsing
+    if ($response.StatusCode -eq 200) { $comfyRunning = $true }
+} catch {}
+
+if ($comfyRunning) {
+    Write-Host "      ComfyUI already running" -ForegroundColor Green
+} else {
+    # Common ComfyUI install locations
+    $comfyPaths = @(
+        "C:\ComfyUI",
+        "$env:USERPROFILE\ComfyUI",
+        "$env:USERPROFILE\Desktop\ComfyUI",
+        "D:\ComfyUI"
+    )
+
+    $comfyDir = $null
+    foreach ($path in $comfyPaths) {
+        if (Test-Path "$path\main.py") {
+            $comfyDir = $path
+            break
+        }
+    }
+
+    if ($comfyDir) {
+        Write-Host "      Starting ComfyUI from $comfyDir..." -ForegroundColor Yellow
+        Start-Process -FilePath "cmd.exe" -ArgumentList "/c cd /d `"$comfyDir`" && python main.py --listen --port 8188" -WindowStyle Minimized
+        Write-Host "      ComfyUI starting in background (http://127.0.0.1:8188)" -ForegroundColor Green
+    } else {
+        Write-Host "      ComfyUI not found - image generation will use cloud API or be unavailable" -ForegroundColor DarkYellow
+        Write-Host "      Install ComfyUI to one of: C:\ComfyUI, $env:USERPROFILE\ComfyUI" -ForegroundColor DarkGray
     }
 }
 
