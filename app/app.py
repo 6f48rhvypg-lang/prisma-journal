@@ -33,7 +33,7 @@ _add_ffmpeg_to_path()
 import time
 import requests
 from datetime import datetime, timedelta
-from flask import Flask, render_template, request, redirect, url_for, jsonify, Response, g
+from flask import Flask, render_template, request, redirect, url_for, jsonify, Response, g, abort
 from flask_compress import Compress
 from werkzeug.utils import secure_filename
 from config import Config, COLOR_THEMES, ARTWORK_STYLES, WHISPER_MODELS
@@ -57,6 +57,8 @@ from database.db import (
     get_all_frameworks,
     get_framework,
     create_framework,
+    update_framework,
+    delete_framework,
     get_streak,
     get_top_emotion,
     get_popular_tags,
@@ -1034,6 +1036,84 @@ def settings():
         prompt_category_descriptions={},
         prompt_placeholders={},
     )
+
+
+@app.route("/frameworks")
+def frameworks_hub():
+    """Frameworks discovery hub page."""
+    frameworks = _translate_frameworks(get_all_frameworks())
+    usage_data = get_framework_usage()["frameworks"]
+    usage_map = {item["id"]: item for item in usage_data}
+    for fw in frameworks:
+        stats = usage_map.get(fw["id"], {})
+        fw["use_count"] = stats.get("count", 0)
+        fw["avg_words"] = stats.get("avg_word_count", 0)
+        fw["last_used"] = stats.get("last_used")
+    categories = sorted({fw["category"] for fw in frameworks if fw.get("category")})
+    return render_template(
+        "frameworks.html",
+        frameworks=frameworks,
+        categories=categories,
+    )
+
+
+@app.route("/framework/start/<int:framework_id>")
+def framework_session(framework_id):
+    """Interactive guided writing session for a framework."""
+    fw = get_framework(framework_id)
+    if not fw:
+        abort(404)
+    fw = _translate_frameworks([fw])[0]
+    return render_template("framework_session.html", framework=fw)
+
+
+@app.route("/api/framework/probe", methods=["POST"])
+def api_framework_probe():
+    """Check a framework answer for vagueness and return one deepening question."""
+    data = request.get_json() or {}
+    framework_name = (data.get("framework_name") or "").strip()
+    question = (data.get("question") or "").strip()
+    answer = (data.get("answer") or "").strip()
+
+    if len(answer) < 40:
+        return jsonify({"follow_up": None})
+
+    from utils.ai import probe_framework_answer
+    result = probe_framework_answer(framework_name, question, answer)
+    return jsonify(result)
+
+
+@app.route("/api/frameworks/<int:framework_id>", methods=["PUT"])
+def api_framework_update(framework_id):
+    """Update a user-created framework."""
+    data = request.get_json() or {}
+    name = (data.get("name") or "").strip()
+    description = (data.get("description") or "").strip()
+    category = (data.get("category") or "").strip()
+    questions_raw = data.get("questions") or []
+
+    if not name:
+        return jsonify({"error": "Framework name is required."}), 400
+    if not questions_raw:
+        return jsonify({"error": "At least one question is required."}), 400
+
+    fw = get_framework(framework_id)
+    if fw is None:
+        return jsonify({"error": "Framework not found."}), 404
+    if fw.get("is_builtin"):
+        return jsonify({"error": "Built-in frameworks cannot be edited."}), 403
+
+    update_framework(framework_id, name, description, questions_raw, category)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/frameworks/<int:framework_id>", methods=["DELETE"])
+def api_framework_delete(framework_id):
+    """Delete a user-created framework."""
+    result = delete_framework(framework_id)
+    if result.get("error"):
+        return jsonify({"error": result["error"]}), 400
+    return jsonify({"ok": True})
 
 
 # ---------------------------------------------------------------------------

@@ -250,6 +250,15 @@
         <div id="big-five-content" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4"></div>
     </div>
 
+    <!-- Framework Usage Widget -->
+    <div id="fw-usage-widget" class="surface-panel p-6 card-fade-in card-fade-in-delay-5" style="display:none">
+        <div class="flex items-center justify-between mb-4">
+            <h3 style="font-family: var(--font-display, Georgia, serif); font-size: 1.1rem; font-weight: 500; color: var(--text)">Frameworks</h3>
+            <a href="/frameworks" class="text-xs transition-colors" style="color: var(--accent); font-family: var(--font-mono, monospace); letter-spacing: 0.04em">EXPLORE ALL &rarr;</a>
+        </div>
+        <div id="fw-usage-bars" class="space-y-3"></div>
+    </div>
+
 </div>
 {% endblock %}
 
@@ -1103,10 +1112,38 @@
         obs.observe(el);
     }
 
+    // Framework usage widget
+    function loadFrameworkUsage() {
+        fetch('/api/insights/frameworks')
+            .then(r => r.json())
+            .then(data => {
+                if (!data || !data.length) return;
+                const widget = document.getElementById('fw-usage-widget');
+                const barsEl = document.getElementById('fw-usage-bars');
+                const top = data.slice(0, 3);
+                const maxUses = Math.max(...top.map(d => d.use_count || 1));
+                barsEl.innerHTML = top.map(d => {
+                    const pct = Math.round((d.use_count / maxUses) * 100);
+                    return `<div>
+                        <div class="flex items-center justify-between mb-1">
+                            <span style="font-size:0.82rem;color:var(--text)">${d.framework_name || '—'}</span>
+                            <span class="meta" style="color:var(--text-3)">${d.use_count} use${d.use_count !== 1 ? 's' : ''}</span>
+                        </div>
+                        <div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden">
+                            <div style="height:100%;width:${pct}%;background:var(--prism);border-radius:2px;transition:width 0.6s ease"></div>
+                        </div>
+                    </div>`;
+                }).join('');
+                widget.style.display = '';
+            })
+            .catch(() => {});
+    }
+
     // Initialize — eager loads first, heavy AI calls deferred until scrolled into view
     loadDailyQuestion();
     loadCalendar(calYear, calMonth);
     loadEmotionBubbles();
+    loadFrameworkUsage();
     BaustellenManager.load();
     lazyLoad('big-five-content', loadBigFive);
     lazyLoad('recurring-topics', loadRecurringTopics);

@@ -157,6 +157,16 @@
             <option value="emotion-DESC" {{ 'selected' if filters.sort == 'emotion' and filters.dir == 'DESC' }}>Emotion Z-A</option>
         </select>
 
+        {# Framework filter dropdown #}
+        {% if frameworks %}
+        <select id="framework-filter" onchange="applyFrameworkFilter()" class="text-sm border border-surface-200 dark:border-surface-600 rounded-lg px-3 py-1.5 bg-white dark:bg-surface-700 text-surface-700 dark:text-surface-200 focus:ring-primary-500 focus:border-primary-500">
+            <option value="">All frameworks</option>
+            {% for fw in frameworks %}
+            <option value="{{ fw.id }}" {{ 'selected' if fw.id | string in filters.framework_ids | map('string') | list }}>{{ fw.name }}</option>
+            {% endfor %}
+        </select>
+        {% endif %}
+
         <div class="flex-1"></div>
 
         {# Multi-select toggle #}
@@ -304,6 +314,18 @@
         const url = new URL(window.location.href);
         url.searchParams.set('sort', sort);
         url.searchParams.set('dir', dir);
+        url.searchParams.set('page', '1');
+        window.location.href = url.toString();
+    };
+
+    // ── Framework filter ──
+    window.applyFrameworkFilter = function() {
+        const sel = document.getElementById('framework-filter');
+        const url = new URL(window.location.href);
+        url.searchParams.delete('framework_ids');
+        if (sel && sel.value) {
+            url.searchParams.set('framework_ids', sel.value);
+        }
         url.searchParams.set('page', '1');
         window.location.href = url.toString();
     };

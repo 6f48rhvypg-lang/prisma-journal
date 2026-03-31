@@ -146,7 +146,8 @@ def init_db():
             name TEXT NOT NULL,
             description TEXT NOT NULL DEFAULT '',
             questions TEXT NOT NULL DEFAULT '[]',  -- JSON array
-            category TEXT NOT NULL DEFAULT ''
+            category TEXT NOT NULL DEFAULT '',
+            is_builtin INTEGER NOT NULL DEFAULT 0
         );
 
         -- Entries
@@ -372,6 +373,28 @@ def _migrate_schema(conn):
             log.info("Migration: Added title column to entries table")
         except Exception as e:
             log.warning("Migration for title failed (may already exist): %s", e)
+
+    # Migration: Add is_builtin column to frameworks table
+    fw_cursor = conn.execute("PRAGMA table_info(frameworks)")
+    fw_columns = {row[1] for row in fw_cursor.fetchall()}
+    if "is_builtin" not in fw_columns:
+        try:
+            conn.execute("ALTER TABLE frameworks ADD COLUMN is_builtin INTEGER NOT NULL DEFAULT 0")
+            _builtin_names = (
+                "Morning Pages", "Gratitude Practice", "CBT Thought Record",
+                "Stoic Reflection", "Future Self", "Problem Solving",
+                "Goal Setting", "Relationship Reflection", "Energy Audit",
+                "Creative Brainstorm", "Fear Setting", "Weekly Review",
+            )
+            placeholders = ",".join("?" * len(_builtin_names))
+            conn.execute(
+                f"UPDATE frameworks SET is_builtin=1 WHERE name IN ({placeholders})",
+                _builtin_names,
+            )
+            conn.commit()
+            log.info("Migration: Added is_builtin column to frameworks table")
+        except Exception as e:
+            log.warning("Migration for is_builtin failed (may already exist): %s", e)
 
     # Migration: Create smart tag system tables
     _migrate_create_smart_tag_tables(conn)
@@ -934,7 +957,7 @@ def _seed_frameworks(conn):
         ),
     ]
     conn.executemany(
-        "INSERT INTO frameworks (name, description, questions, category) VALUES (?, ?, ?, ?)",
+        "INSERT INTO frameworks (name, description, questions, category, is_builtin) VALUES (?, ?, ?, ?, 1)",
         frameworks,
     )
     conn.commit()
@@ -2014,13 +2037,47 @@ def create_framework(name, description, questions, category):
     normalized_questions = _normalize_questions(questions)
     conn = get_connection()
     cursor = conn.execute(
-        "INSERT INTO frameworks (name, description, questions, category) VALUES (?, ?, ?, ?)",
+        "INSERT INTO frameworks (name, description, questions, category, is_builtin) VALUES (?, ?, ?, ?, 0)",
         (name, description, json.dumps(normalized_questions), category),
     )
     fid = cursor.lastrowid
     conn.commit()
     conn.close()
     return fid
+
+
+def update_framework(framework_id, name, description, questions, category):
+    """Update a user-created framework. Built-in frameworks cannot be modified."""
+    normalized_questions = _normalize_questions(questions)
+    conn = get_connection()
+    conn.execute(
+        "UPDATE frameworks SET name=?, description=?, questions=?, category=? WHERE id=? AND is_builtin=0",
+        (name, description, json.dumps(normalized_questions), category, framework_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def delete_framework(framework_id):
+    """Delete a user-created framework. Returns error if linked entries exist or is built-in."""
+    conn = get_connection()
+    row = conn.execute("SELECT is_builtin FROM frameworks WHERE id=?", (framework_id,)).fetchone()
+    if row is None:
+        conn.close()
+        return {"error": "Framework not found."}
+    if row["is_builtin"]:
+        conn.close()
+        return {"error": "Built-in frameworks cannot be deleted."}
+    entry_count = conn.execute(
+        "SELECT COUNT(*) FROM entries WHERE framework_id=?", (framework_id,)
+    ).fetchone()[0]
+    if entry_count > 0:
+        conn.close()
+        return {"error": f"Cannot delete: {entry_count} entr{'y' if entry_count == 1 else 'ies'} use this framework."}
+    conn.execute("DELETE FROM frameworks WHERE id=? AND is_builtin=0", (framework_id,))
+    conn.commit()
+    conn.close()
+    return {}
 
 
 # ---------------------------------------------------------------------------

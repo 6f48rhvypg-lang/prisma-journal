@@ -390,6 +390,37 @@ def generate_deeper_questions(text, previous_questions=None):
     return {"error": "Could not parse question from AI response."}
 
 
+def probe_framework_answer(framework_name, question, answer):
+    """Return one specific deepening question, or None if the answer is already concrete.
+
+    Used during interactive framework sessions to surface vague or unnamed things
+    in the user's answer — not to check completeness, but to find specificity.
+    """
+    llm_ok, llm_error = _check_llm_available()
+    if not llm_ok:
+        return {"follow_up": None}
+
+    system = (
+        f"You are a thoughtful journaling guide helping someone work through the '{framework_name}' framework. "
+        "They just answered a question. Your job is to look for one thing that is vague, unnamed, or glossed over, "
+        "and ask ONE specific, curious follow-up question that helps them go deeper — not broader. "
+        "If the answer is already concrete and specific, respond with exactly: NONE\n"
+        "Do not ask multiple questions. Do not affirm or praise. Do not say 'great answer'. "
+        "Just the question, or NONE."
+    )
+    prompt = f"Question: {question}\n\nTheir answer:\n{answer[:1500]}"
+    response = chat_with_ollama(prompt, system_prompt=system)
+
+    if not response or response.startswith("[Error") or response.startswith("[Ollama"):
+        return {"follow_up": None}
+
+    cleaned = response.strip().strip('"\'')
+    if cleaned.upper() == "NONE" or not cleaned:
+        return {"follow_up": None}
+
+    return {"follow_up": cleaned}
+
+
 # ---------------------------------------------------------------------------
 # JSON Parsing Helper
 # ---------------------------------------------------------------------------

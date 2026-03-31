@@ -1,0 +1,673 @@
+{% extends "base.html" %}
+{% block title %}{{ framework.name }}{% endblock %}
+
+{% block head %}
+<style>
+    /* ── Session layout ───────────────────────────────────── */
+    #session-wrap {
+        max-width: 640px;
+        margin: 0 auto;
+        padding: 0 0 6rem 0;
+    }
+
+    /* ── Prism bar ────────────────────────────────────────── */
+    .session-prism-bar {
+        height: 3px;
+        background: var(--prism);
+        border-radius: 0 0 2px 2px;
+        margin-bottom: 2.5rem;
+    }
+
+    /* ── Session chrome ───────────────────────────────────── */
+    .session-chrome {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 3rem;
+    }
+    .session-fw-name {
+        font-family: var(--font-mono, monospace);
+        font-size: 0.68rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--text-3);
+    }
+    .session-progress {
+        font-family: var(--font-mono, monospace);
+        font-size: 0.68rem;
+        letter-spacing: 0.06em;
+        color: var(--text-3);
+    }
+    .session-progress em {
+        font-style: normal;
+        color: var(--text-2);
+    }
+
+    /* ── Question display ─────────────────────────────────── */
+    #question-stage {
+        min-height: 60vh;
+        display: flex;
+        flex-direction: column;
+    }
+    .q-number {
+        font-family: var(--font-mono, monospace);
+        font-size: 0.65rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 1rem;
+        opacity: 0.8;
+    }
+    #q-text {
+        font-family: var(--font-display, 'Cormorant Garamond', Georgia, serif);
+        font-size: clamp(1.55rem, 3vw, 1.95rem);
+        font-weight: 500;
+        line-height: 1.45;
+        color: var(--text);
+        margin-bottom: 1.75rem;
+        transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+    #q-text.fading {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+
+    /* ── Main answer textarea ─────────────────────────────── */
+    #answer-area {
+        width: 100%;
+        min-height: 160px;
+        background: transparent;
+        border: none;
+        border-bottom: 1.5px solid var(--border);
+        border-radius: 0;
+        padding: 0.25rem 0 0.75rem 0;
+        font-family: var(--font-sans, 'DM Sans', sans-serif);
+        font-size: 1rem;
+        line-height: 1.7;
+        color: var(--text);
+        resize: none;
+        outline: none;
+        transition: border-color 0.2s;
+        overflow: hidden;
+    }
+    #answer-area::placeholder {
+        color: var(--text-3);
+    }
+    #answer-area:focus {
+        border-bottom-color: var(--accent);
+    }
+
+    /* ── Follow-up zone ───────────────────────────────────── */
+    #followup-zone {
+        margin-top: 2rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--border);
+        display: none;
+        opacity: 0;
+        transform: translateY(10px);
+        transition: opacity 0.35s ease, transform 0.35s ease;
+    }
+    #followup-zone.visible {
+        display: block;
+    }
+    #followup-zone.revealed {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    .followup-label {
+        font-family: var(--font-mono, monospace);
+        font-size: 0.62rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--text-3);
+        margin-bottom: 0.6rem;
+    }
+    #followup-q {
+        font-family: var(--font-display, 'Cormorant Garamond', Georgia, serif);
+        font-size: 1.15rem;
+        font-style: italic;
+        font-weight: 400;
+        line-height: 1.55;
+        color: var(--text-2);
+        margin-bottom: 1rem;
+    }
+    #followup-area {
+        width: 100%;
+        min-height: 100px;
+        background: transparent;
+        border: none;
+        border-bottom: 1.5px solid var(--border);
+        border-radius: 0;
+        padding: 0.25rem 0 0.75rem 0;
+        font-family: var(--font-sans, 'DM Sans', sans-serif);
+        font-size: 0.95rem;
+        line-height: 1.65;
+        color: var(--text);
+        resize: none;
+        outline: none;
+        transition: border-color 0.2s;
+        overflow: hidden;
+    }
+    #followup-area::placeholder {
+        color: var(--text-3);
+    }
+    #followup-area:focus {
+        border-bottom-color: var(--accent);
+    }
+
+    /* ── Controls ─────────────────────────────────────────── */
+    .session-controls {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 2rem;
+        gap: 1rem;
+    }
+    #btn-continue {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0.55rem 1.4rem;
+        background: var(--text);
+        color: var(--bg);
+        font-family: var(--font-sans, 'DM Sans', sans-serif);
+        font-size: 0.875rem;
+        font-weight: 500;
+        letter-spacing: 0.01em;
+        border: none;
+        border-radius: 99px;
+        cursor: pointer;
+        transition: opacity 0.15s, transform 0.1s;
+        white-space: nowrap;
+    }
+    #btn-continue:hover {
+        opacity: 0.85;
+        transform: translateY(-1px);
+    }
+    #btn-continue:active {
+        transform: translateY(0);
+    }
+    #btn-continue:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+        transform: none;
+    }
+    #btn-skip {
+        font-family: var(--font-mono, monospace);
+        font-size: 0.65rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-3);
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 0.4rem 0;
+        display: none;
+        transition: color 0.15s;
+    }
+    #btn-skip:hover {
+        color: var(--text-2);
+    }
+    #btn-skip.visible {
+        display: block;
+    }
+
+    /* ── Probe spinner ────────────────────────────────────── */
+    #probe-spinner {
+        display: none;
+        align-items: center;
+        gap: 8px;
+        color: var(--text-3);
+        font-family: var(--font-mono, monospace);
+        font-size: 0.65rem;
+        letter-spacing: 0.08em;
+    }
+    #probe-spinner.active {
+        display: flex;
+    }
+    .spin-dot {
+        width: 5px; height: 5px;
+        border-radius: 50%;
+        background: var(--accent);
+        animation: pulse-dot 1.2s ease-in-out infinite;
+    }
+    .spin-dot:nth-child(2) { animation-delay: 0.2s; }
+    .spin-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes pulse-dot {
+        0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+        40% { opacity: 1; transform: scale(1.2); }
+    }
+
+    /* ── Review screen ────────────────────────────────────── */
+    #review-screen {
+        display: none;
+        animation: fadeUp 0.4s ease both;
+    }
+    #review-screen.visible {
+        display: block;
+    }
+    @keyframes fadeUp {
+        from { opacity: 0; transform: translateY(14px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+    .review-header {
+        margin-bottom: 2.5rem;
+    }
+    .review-header h2 {
+        font-family: var(--font-display, 'Cormorant Garamond', Georgia, serif);
+        font-size: 1.65rem;
+        font-weight: 500;
+        color: var(--text);
+        margin-bottom: 0.4rem;
+    }
+    .review-header p {
+        font-size: 0.82rem;
+        color: var(--text-3);
+        font-family: var(--font-mono, monospace);
+        letter-spacing: 0.04em;
+    }
+    .review-block {
+        margin-bottom: 2rem;
+        padding-bottom: 2rem;
+        border-bottom: 1px solid var(--border);
+    }
+    .review-block:last-of-type {
+        border-bottom: none;
+    }
+    .review-q {
+        font-family: var(--font-display, 'Cormorant Garamond', Georgia, serif);
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: var(--text);
+        margin-bottom: 0.5rem;
+        line-height: 1.4;
+    }
+    .review-a {
+        font-family: var(--font-sans, 'DM Sans', sans-serif);
+        font-size: 0.9rem;
+        line-height: 1.7;
+        color: var(--text-2);
+        white-space: pre-wrap;
+    }
+    .review-followup {
+        margin-top: 1rem;
+        padding: 0.75rem 1rem;
+        background: var(--surface-2);
+        border-left: 2px solid var(--border);
+        border-radius: 0 4px 4px 0;
+    }
+    .review-followup-q {
+        font-family: var(--font-display, 'Cormorant Garamond', Georgia, serif);
+        font-size: 0.9rem;
+        font-style: italic;
+        color: var(--text-3);
+        margin-bottom: 0.35rem;
+    }
+    .review-followup-a {
+        font-family: var(--font-sans, 'DM Sans', sans-serif);
+        font-size: 0.85rem;
+        line-height: 1.65;
+        color: var(--text-2);
+        white-space: pre-wrap;
+    }
+    #btn-save {
+        width: 100%;
+        padding: 0.7rem 1.5rem;
+        margin-top: 2rem;
+        background: var(--text);
+        color: var(--bg);
+        font-family: var(--font-sans, 'DM Sans', sans-serif);
+        font-size: 0.9rem;
+        font-weight: 500;
+        letter-spacing: 0.01em;
+        border: none;
+        border-radius: 99px;
+        cursor: pointer;
+        transition: opacity 0.15s, transform 0.1s;
+    }
+    #btn-save:hover {
+        opacity: 0.85;
+        transform: translateY(-1px);
+    }
+    .review-back-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-family: var(--font-mono, monospace);
+        font-size: 0.65rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-3);
+        text-decoration: none;
+        margin-bottom: 2rem;
+        transition: color 0.15s;
+    }
+    .review-back-link:hover { color: var(--text-2); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="session-wrap">
+
+    <!-- Prism accent bar -->
+    <div class="session-prism-bar"></div>
+
+    <!-- Session chrome: framework name + progress -->
+    <div class="session-chrome">
+        <a href="/frameworks" class="session-fw-name" style="text-decoration:none; transition: color 0.15s" onmouseover="this.style.color='var(--text-2)'" onmouseout="this.style.color='var(--text-3)'">
+            ← {{ framework.name }}
+        </a>
+        <span class="session-progress">
+            <em id="prog-current">1</em> / {{ framework.questions | length }}
+        </span>
+    </div>
+
+    <!-- ── Question stage ─────────────────────────────── -->
+    <div id="question-stage">
+        <div class="q-number" id="q-num-label">Question 1</div>
+        <div id="q-text"></div>
+
+        <label for="answer-area" class="sr-only">Your answer</label>
+        <textarea
+            id="answer-area"
+            rows="10"
+            autocomplete="off"
+            spellcheck="true"
+        ></textarea>
+
+        <!-- Follow-up zone -->
+        <div id="followup-zone">
+            <div class="followup-label">Going deeper</div>
+            <div id="followup-q"></div>
+            <label for="followup-area" class="sr-only">Follow-up answer</label>
+            <textarea
+                id="followup-area"
+                rows="5"
+                autocomplete="off"
+                spellcheck="true"
+                placeholder="You can leave this blank if you'd prefer to move on…"
+            ></textarea>
+        </div>
+
+        <!-- Controls -->
+        <div class="session-controls">
+            <div style="display:flex; align-items:center; gap: 0.75rem">
+                <button id="btn-continue" type="button">
+                    Continue
+                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </button>
+                <button id="btn-skip" type="button">Skip →</button>
+            </div>
+            <div id="probe-spinner">
+                <div class="spin-dot"></div>
+                <div class="spin-dot"></div>
+                <div class="spin-dot"></div>
+                <span>thinking</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Review screen ──────────────────────────────── -->
+    <div id="review-screen">
+        <a href="/frameworks" class="review-back-link">← Back to frameworks</a>
+        <div class="review-header">
+            <h2>Your session</h2>
+            <p>{{ framework.name }} · {{ framework.questions | length }} question{{ 's' if framework.questions | length != 1 }}</p>
+        </div>
+        <div id="review-blocks"></div>
+        <form id="save-form" method="POST" action="/entry/new">
+            <input type="hidden" name="entry_type" value="framework">
+            <input type="hidden" name="framework_id" value="{{ framework.id }}">
+            <input type="hidden" id="save-content" name="content" value="">
+            <button id="btn-save" type="submit">Save as journal entry</button>
+        </form>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    /* ── Data from server ───────────────────────────────── */
+    const QUESTIONS = {{ framework.questions | tojson }};
+    const FW_NAME   = {{ framework.name | tojson }};
+    const TOTAL     = QUESTIONS.length;
+
+    /* ── State ──────────────────────────────────────────── */
+    let currentIdx      = 0;
+    let probeInFlight   = false;
+    let followUpShowing = false;
+    const answers = []; // {question, answer, followUp, followUpAnswer}
+
+    /* ── DOM refs ───────────────────────────────────────── */
+    const qStage       = document.getElementById('question-stage');
+    const reviewScreen = document.getElementById('review-screen');
+    const qText        = document.getElementById('q-text');
+    const qNumLabel    = document.getElementById('q-num-label');
+    const progCurrent  = document.getElementById('prog-current');
+    const answerArea   = document.getElementById('answer-area');
+    const followupZone = document.getElementById('followup-zone');
+    const followupQ    = document.getElementById('followup-q');
+    const followupArea = document.getElementById('followup-area');
+    const btnContinue  = document.getElementById('btn-continue');
+    const btnSkip      = document.getElementById('btn-skip');
+    const probeSpinner = document.getElementById('probe-spinner');
+    const reviewBlocks = document.getElementById('review-blocks');
+    const saveContent  = document.getElementById('save-content');
+
+    /* ── Auto-expand textareas ──────────────────────────── */
+    function autoResize(el) {
+        el.style.height = 'auto';
+        el.style.height = el.scrollHeight + 'px';
+    }
+    answerArea.addEventListener('input',   () => autoResize(answerArea));
+    followupArea.addEventListener('input', () => autoResize(followupArea));
+
+    /* ── Render a question ──────────────────────────────── */
+    function renderQuestion(idx) {
+        const q = QUESTIONS[idx];
+        const isLast = idx === TOTAL - 1;
+
+        // Fade out text, swap, fade in
+        qText.classList.add('fading');
+        setTimeout(() => {
+            qText.textContent = q.question;
+            qText.classList.remove('fading');
+        }, 250);
+
+        qNumLabel.textContent = `Question ${idx + 1}`;
+        progCurrent.textContent = idx + 1;
+        answerArea.value = '';
+        answerArea.style.height = '';
+        answerArea.placeholder = q.placeholder || 'Write freely…';
+
+        hideFollowUp();
+        probeSpinner.classList.remove('active');
+        btnSkip.classList.remove('visible');
+        btnContinue.disabled = false;
+        btnContinue.innerHTML = isLast
+            ? 'Finish <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>'
+            : 'Continue <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>';
+
+        // Focus the textarea after the transition
+        setTimeout(() => answerArea.focus(), 300);
+    }
+
+    /* ── Show / hide follow-up ──────────────────────────── */
+    function showFollowUp(text) {
+        followUpShowing = true;
+        followupQ.textContent = text;
+        followupArea.value = '';
+        followupArea.style.height = '';
+        followupZone.style.display = 'block';
+        followupZone.classList.add('visible');
+        // Trigger CSS transition
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                followupZone.classList.add('revealed');
+            });
+        });
+        btnSkip.classList.add('visible');
+        btnContinue.innerHTML = 'Next <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>';
+        followupArea.focus();
+    }
+
+    function hideFollowUp() {
+        followUpShowing = false;
+        followupZone.classList.remove('visible', 'revealed');
+        followupZone.style.display = 'none';
+        btnSkip.classList.remove('visible');
+    }
+
+    /* ── Probe the answer via AI ────────────────────────── */
+    async function probeAnswer(question, answer) {
+        probeSpinner.classList.add('active');
+        btnContinue.disabled = true;
+        try {
+            const res = await fetch('/api/framework/probe', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ framework_name: FW_NAME, question, answer })
+            });
+            if (!res.ok) return null;
+            const data = await res.json();
+            return data.follow_up || null;
+        } catch (_) {
+            return null;
+        } finally {
+            probeSpinner.classList.remove('active');
+            btnContinue.disabled = false;
+        }
+    }
+
+    /* ── Advance to next question or finish ─────────────── */
+    function advanceOrFinish() {
+        if (currentIdx < TOTAL - 1) {
+            currentIdx++;
+            renderQuestion(currentIdx);
+        } else {
+            showReview();
+        }
+    }
+
+    /* ── Main continue handler ──────────────────────────── */
+    btnContinue.addEventListener('click', async () => {
+        if (probeInFlight) return;
+
+        if (followUpShowing) {
+            // Collect follow-up answer and move on
+            const fuAnswer = followupArea.value.trim();
+            answers[currentIdx].followUpAnswer = fuAnswer || null;
+            advanceOrFinish();
+            return;
+        }
+
+        // Collect main answer
+        const answer = answerArea.value.trim();
+        const q = QUESTIONS[currentIdx];
+        answers[currentIdx] = {
+            question:       q.question,
+            answer:         answer,
+            followUp:       null,
+            followUpAnswer: null
+        };
+
+        const isLast = currentIdx === TOTAL - 1;
+
+        // Skip probe if answer too short, or it's the last question
+        if (isLast || answer.length < 40) {
+            advanceOrFinish();
+            return;
+        }
+
+        // Run AI probe
+        probeInFlight = true;
+        const followUp = await probeAnswer(q.question, answer);
+        probeInFlight = false;
+
+        if (followUp) {
+            answers[currentIdx].followUp = followUp;
+            showFollowUp(followUp);
+        } else {
+            advanceOrFinish();
+        }
+    });
+
+    /* ── Skip follow-up ─────────────────────────────────── */
+    btnSkip.addEventListener('click', () => {
+        answers[currentIdx].followUpAnswer = null;
+        advanceOrFinish();
+    });
+
+    /* ── Build review screen ────────────────────────────── */
+    function showReview() {
+        qStage.style.display = 'none';
+        reviewScreen.classList.add('visible');
+
+        // Build review blocks
+        let html = '';
+        let markdown = '';
+
+        answers.forEach((item, i) => {
+            html += `<div class="review-block">
+                <div class="review-q">${escHtml(item.question)}</div>
+                <div class="review-a">${escHtml(item.answer || '—')}</div>`;
+
+            markdown += `## ${item.question}\n${item.answer || ''}\n`;
+
+            if (item.followUp && item.followUpAnswer) {
+                html += `<div class="review-followup">
+                    <div class="review-followup-q">${escHtml(item.followUp)}</div>
+                    <div class="review-followup-a">${escHtml(item.followUpAnswer)}</div>
+                </div>`;
+                markdown += `\n### ${item.followUp}\n${item.followUpAnswer}\n`;
+            }
+
+            html += `</div>`;
+
+            if (i < answers.length - 1) {
+                markdown += `\n---\n`;
+            }
+
+            markdown += `\n`;
+        });
+
+        reviewBlocks.innerHTML = html;
+        saveContent.value = markdown.trim();
+    }
+
+    /* ── Escape helper ──────────────────────────────────── */
+    function escHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    /* ── Keyboard shortcut: Ctrl/Cmd + Enter to continue ── */
+    document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            if (!reviewScreen.classList.contains('visible') && !btnContinue.disabled) {
+                btnContinue.click();
+            }
+        }
+    });
+
+    /* ── Init (no fade on first load) ──────────────────── */
+    const q0 = QUESTIONS[0];
+    qText.textContent = q0.question;
+    qNumLabel.textContent = 'Question 1';
+    progCurrent.textContent = '1';
+    answerArea.placeholder = q0.placeholder || 'Write freely…';
+    btnContinue.innerHTML = TOTAL === 1
+        ? 'Finish <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>'
+        : 'Continue <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>';
+    answerArea.focus();
+})();
+</script>
+{% endblock %}

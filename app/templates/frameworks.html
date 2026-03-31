@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+{% block title %}Frameworks{% endblock %}
+
+{% block head %}
+<style>
+    .fw-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        box-shadow: var(--shadow-md);
+        transition: box-shadow 0.18s, transform 0.18s;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    .fw-card:hover {
+        box-shadow: 0 8px 32px -6px rgba(26,23,20,0.13), 0 2px 8px rgba(26,23,20,0.06);
+        transform: translateY(-2px);
+    }
+    .fw-card-prism-bar {
+        height: 3px;
+        background: var(--prism);
+        opacity: 0;
+        transition: opacity 0.18s;
+    }
+    .fw-card:hover .fw-card-prism-bar,
+    .fw-card.featured .fw-card-prism-bar {
+        opacity: 1;
+    }
+    .category-pill {
+        font-family: var(--font-mono, monospace);
+        font-size: 0.68rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        padding: 2px 8px;
+        border-radius: 20px;
+        background: var(--surface-2);
+        color: var(--text-2);
+        border: 1px solid var(--border);
+    }
+    .fw-questions-preview {
+        display: none;
+    }
+    .fw-questions-preview.open {
+        display: block;
+    }
+    .cat-filter-btn {
+        font-family: var(--font-mono, monospace);
+        font-size: 0.7rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        padding: 5px 12px;
+        border-radius: 20px;
+        border: 1px solid var(--border);
+        color: var(--text-2);
+        background: transparent;
+        cursor: pointer;
+        transition: all 0.15s;
+        white-space: nowrap;
+    }
+    .cat-filter-btn:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+    }
+    .cat-filter-btn.active {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+    }
+    .builtin-badge {
+        font-family: var(--font-mono, monospace);
+        font-size: 0.62rem;
+        letter-spacing: 0.05em;
+        padding: 1px 6px;
+        border-radius: 4px;
+        background: var(--surface-2);
+        color: var(--text-3);
+        border: 1px solid var(--border);
+    }
+    .fw-q-item {
+        display: flex;
+        gap: 10px;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--border);
+        font-size: 0.82rem;
+        color: var(--text-2);
+        line-height: 1.5;
+    }
+    .fw-q-item:last-child { border-bottom: none; }
+    .fw-q-num {
+        font-family: var(--font-mono, monospace);
+        font-size: 0.68rem;
+        color: var(--text-3);
+        min-width: 18px;
+        padding-top: 2px;
+    }
+    .no-results-msg {
+        display: none;
+    }
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(10px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+    .fw-card.card-fade-in { animation: fadeInUp 0.32s ease both; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-8 pb-16">
+
+    <!-- Page header -->
+    <div class="pt-6">
+        <h1 class="mb-1" style="font-family: var(--font-display, Georgia, serif); font-size: 2rem; font-weight: 500; color: var(--text)">Frameworks</h1>
+        <p style="font-size: 0.9rem; color: var(--text-2)">Structured templates to guide your writing. Pick one to start a focused session.</p>
+    </div>
+
+    <!-- Category filter bar -->
+    <div class="flex flex-wrap gap-2 items-center">
+        <button class="cat-filter-btn active" data-cat="all">All</button>
+        {% for cat in categories %}
+        <button class="cat-filter-btn" data-cat="{{ cat }}">{{ cat }}</button>
+        {% endfor %}
+    </div>
+
+    <!-- Framework grid -->
+    <div id="fw-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+
+        {% for fw in frameworks %}
+        <div class="fw-card card-fade-in"
+             data-fw-id="{{ fw.id }}"
+             data-category="{{ fw.category | lower }}"
+             style="animation-delay: {{ loop.index0 * 0.04 }}s">
+
+            <!-- Prism accent bar (visible on hover) -->
+            <div class="fw-card-prism-bar"></div>
+
+            <div class="p-5 flex-1 flex flex-col gap-3">
+
+                <!-- Header row -->
+                <div class="flex items-start justify-between gap-2">
+                    <div class="flex-1 min-w-0">
+                        <h2 class="leading-snug" style="font-family: var(--font-display, Georgia, serif); font-size: 1.2rem; font-weight: 500; color: var(--text)">{{ fw.name }}</h2>
+                    </div>
+                    {% if fw.is_builtin %}
+                    <span class="builtin-badge shrink-0 mt-0.5">built-in</span>
+                    {% else %}
+                    <span class="builtin-badge shrink-0 mt-0.5" style="color: var(--accent); border-color: var(--accent)">custom</span>
+                    {% endif %}
+                </div>
+
+                <!-- Category + question count meta row -->
+                <div class="flex items-center gap-2 flex-wrap">
+                    {% if fw.category %}
+                    <span class="category-pill">{{ fw.category }}</span>
+                    {% endif %}
+                    <span class="meta" style="color: var(--text-3)">{{ fw.questions | length }} question{{ 's' if fw.questions | length != 1 }}</span>
+                    {% if fw.use_count %}
+                    <span class="meta" style="color: var(--text-3)">{{ fw.use_count }} use{{ 's' if fw.use_count != 1 }}</span>
+                    {% endif %}
+                </div>
+
+                <!-- Description -->
+                <p style="font-size: 0.84rem; color: var(--text-2); line-height: 1.55; flex: 1">{{ fw.description }}</p>
+
+                <!-- Questions preview toggle -->
+                <div>
+                    <button class="fw-preview-toggle flex items-center gap-1.5 text-xs transition-colors"
+                            style="color: var(--text-3); font-family: var(--font-mono, monospace); letter-spacing: 0.04em; background: none; border: none; cursor: pointer; padding: 0"
+                            data-fw="{{ fw.id }}">
+                        <svg class="w-3 h-3 transition-transform fw-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                        PREVIEW QUESTIONS
+                    </button>
+                    <div id="fw-preview-{{ fw.id }}" class="fw-questions-preview mt-3">
+                        {% for q in fw.questions %}
+                        <div class="fw-q-item">
+                            <span class="fw-q-num">{{ loop.index }}</span>
+                            <span>{{ q.question }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Action footer -->
+            <div class="px-5 pb-4">
+                <a href="/framework/start/{{ fw.id }}"
+                   class="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-full transition-all w-full justify-center"
+                   style="background: var(--text); color: var(--bg); letter-spacing: 0.01em">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                    </svg>
+                    Start writing
+                </a>
+            </div>
+
+        </div>
+        {% endfor %}
+
+    </div>
+
+    <!-- Empty state for filtered view -->
+    <p id="no-results" class="no-results-msg text-center py-12" style="color: var(--text-3); font-family: var(--font-mono, monospace); font-size: 0.8rem; letter-spacing: 0.04em">
+        NO FRAMEWORKS IN THIS CATEGORY
+    </p>
+
+</div>
+
+<script>
+(function() {
+    const filterBtns = document.querySelectorAll('.cat-filter-btn');
+    const cards = document.querySelectorAll('.fw-card');
+    const noResults = document.getElementById('no-results');
+
+    filterBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            filterBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const cat = btn.dataset.cat;
+            let visible = 0;
+            cards.forEach(card => {
+                const matches = cat === 'all' || card.dataset.category === cat;
+                card.style.display = matches ? '' : 'none';
+                if (matches) visible++;
+            });
+            noResults.style.display = visible === 0 ? 'block' : 'none';
+        });
+    });
+
+    document.querySelectorAll('.fw-preview-toggle').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const id = btn.dataset.fw;
+            const panel = document.getElementById('fw-preview-' + id);
+            const chevron = btn.querySelector('.fw-chevron');
+            const isOpen = panel.classList.toggle('open');
+            chevron.style.transform = isOpen ? 'rotate(90deg)' : '';
+            btn.style.color = isOpen ? 'var(--accent)' : '';
+        });
+    });
+})();
+</script>
+{% endblock %}

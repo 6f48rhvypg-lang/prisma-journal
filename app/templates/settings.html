@@ -399,18 +399,120 @@
 
         <div class="pt-2">
             <h3 class="text-sm font-semibold text-surface-900 dark:text-white mb-3">Available Frameworks</h3>
-            <div class="space-y-2">
+            <div class="space-y-2" id="fw-list">
                 {% for fw in frameworks %}
-                <div class="flex items-center justify-between rounded-lg border border-surface-200 dark:border-surface-700 px-3 py-2">
+                <div class="flex items-center justify-between rounded-lg border border-surface-200 dark:border-surface-700 px-3 py-2" id="fw-row-{{ fw.id }}">
                     <div>
-                        <p class="text-sm font-medium text-surface-800 dark:text-surface-200">{{ fw.name }}</p>
-                        <p class="text-xs text-surface-500 dark:text-surface-400">{{ fw.category or 'general' }} · {{ fw.questions | length }} questions</p>
+                        <p class="text-sm font-medium text-surface-800 dark:text-surface-200">
+                            {{ fw.name }}
+                            {% if fw.is_builtin %}
+                            <span class="ml-1.5 text-xs text-surface-400" style="font-family: monospace">[built-in]</span>
+                            {% endif %}
+                        </p>
+                        <p class="text-xs text-surface-500 dark:text-surface-400">{{ fw.category or 'general' }} &middot; {{ fw.questions | length }} questions</p>
                     </div>
+                    {% if not fw.is_builtin %}
+                    <div class="flex items-center gap-1.5 shrink-0 ml-3">
+                        <button type="button"
+                                onclick="openEditModal({{ fw.id }}, {{ fw.name | tojson }}, {{ fw.description | tojson }}, {{ fw.category | tojson }}, {{ fw.questions | map(attribute='question') | list | tojson }})"
+                                class="text-xs px-2.5 py-1 rounded-lg border border-surface-200 dark:border-surface-700 text-surface-600 dark:text-surface-300 hover:border-primary-400 hover:text-primary-600 dark:hover:text-primary-400 transition">
+                            Edit
+                        </button>
+                        <button type="button"
+                                onclick="deleteFramework({{ fw.id }}, {{ fw.name | tojson }})"
+                                class="text-xs px-2.5 py-1 rounded-lg border border-red-200 dark:border-red-900/40 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition">
+                            Delete
+                        </button>
+                    </div>
+                    {% endif %}
                 </div>
                 {% endfor %}
             </div>
         </div>
     </div>
+
+    <!-- Edit Framework Modal -->
+    <div id="edit-fw-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 hidden">
+        <div class="bg-white dark:bg-surface-800 rounded-2xl border border-surface-200 dark:border-surface-700 shadow-xl p-6 w-full max-w-md mx-4 space-y-4">
+            <h3 class="text-base font-semibold text-surface-900 dark:text-white">Edit Framework</h3>
+            <input type="hidden" id="edit-fw-id">
+            <div class="grid gap-3 md:grid-cols-2">
+                <div>
+                    <label class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">Name</label>
+                    <input type="text" id="edit-fw-name" class="w-full rounded-lg border border-surface-300 dark:border-surface-600 px-3 py-2 text-sm bg-white dark:bg-surface-700 text-surface-900 dark:text-surface-100 outline-none focus:ring-2 focus:ring-primary-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">Category</label>
+                    <input type="text" id="edit-fw-category" class="w-full rounded-lg border border-surface-300 dark:border-surface-600 px-3 py-2 text-sm bg-white dark:bg-surface-700 text-surface-900 dark:text-surface-100 outline-none focus:ring-2 focus:ring-primary-500">
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">Description</label>
+                <input type="text" id="edit-fw-description" class="w-full rounded-lg border border-surface-300 dark:border-surface-600 px-3 py-2 text-sm bg-white dark:bg-surface-700 text-surface-900 dark:text-surface-100 outline-none focus:ring-2 focus:ring-primary-500">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">Questions (one per line)</label>
+                <textarea id="edit-fw-questions" rows="5" class="w-full rounded-lg border border-surface-300 dark:border-surface-600 px-3 py-2 text-sm bg-white dark:bg-surface-700 text-surface-900 dark:text-surface-100 outline-none focus:ring-2 focus:ring-primary-500"></textarea>
+            </div>
+            <div id="edit-fw-error" class="text-xs text-red-500 hidden"></div>
+            <div class="flex justify-end gap-2 pt-1">
+                <button type="button" onclick="closeEditModal()" class="px-4 py-2 text-sm rounded-lg border border-surface-200 dark:border-surface-700 text-surface-600 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-700 transition">Cancel</button>
+                <button type="button" onclick="saveEditFramework()" class="px-4 py-2 text-sm rounded-lg bg-primary-600 text-white font-medium hover:bg-primary-700 transition">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    function openEditModal(id, name, description, category, questions) {
+        document.getElementById('edit-fw-id').value = id;
+        document.getElementById('edit-fw-name').value = name;
+        document.getElementById('edit-fw-description').value = description;
+        document.getElementById('edit-fw-category').value = category;
+        document.getElementById('edit-fw-questions').value = questions.join('\n');
+        document.getElementById('edit-fw-error').classList.add('hidden');
+        document.getElementById('edit-fw-modal').classList.remove('hidden');
+    }
+    function closeEditModal() {
+        document.getElementById('edit-fw-modal').classList.add('hidden');
+    }
+    function saveEditFramework() {
+        const id = document.getElementById('edit-fw-id').value;
+        const name = document.getElementById('edit-fw-name').value.trim();
+        const description = document.getElementById('edit-fw-description').value.trim();
+        const category = document.getElementById('edit-fw-category').value.trim();
+        const questionsRaw = document.getElementById('edit-fw-questions').value;
+        const questions = questionsRaw.split('\n').map(l => l.trim()).filter(Boolean);
+        const errEl = document.getElementById('edit-fw-error');
+        if (!name) { errEl.textContent = 'Name is required.'; errEl.classList.remove('hidden'); return; }
+        if (!questions.length) { errEl.textContent = 'At least one question is required.'; errEl.classList.remove('hidden'); return; }
+        fetch(`/api/frameworks/${id}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name, description, category, questions})
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) { errEl.textContent = data.error; errEl.classList.remove('hidden'); return; }
+            closeEditModal();
+            window.location.reload();
+        })
+        .catch(() => { errEl.textContent = 'Network error.'; errEl.classList.remove('hidden'); });
+    }
+    function deleteFramework(id, name) {
+        if (!confirm(`Delete framework "${name}"? This cannot be undone.`)) return;
+        fetch(`/api/frameworks/${id}`, {method: 'DELETE'})
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) { alert(data.error); return; }
+            const row = document.getElementById('fw-row-' + id);
+            if (row) row.remove();
+        })
+        .catch(() => alert('Network error.'));
+    }
+    document.getElementById('edit-fw-modal').addEventListener('click', function(e) {
+        if (e.target === this) closeEditModal();
+    });
+    </script>
 
     <!-- System Prompts Editor -->
     <div class="bg-white dark:bg-surface-800 rounded-2xl border border-surface-200 dark:border-surface-700 p-6 space-y-5">
